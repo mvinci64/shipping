@@ -11,7 +11,10 @@ Input:  CSV con colonne  order_number, cliente, data_consegna, sku, qta
 
 Output in out/:
     cartonizzazione.json          composizione scatoloni per ordine (con pesi)
-    etichette_<ordine>.pdf        un'etichetta 100×150 mm per scatolone
+    etichette_colli_<ordine>.pdf  un'etichetta per ogni collo WP50/WP40 (lotto+qtà) —
+                                   quella che conta ai fini di tracciabilità
+    etichette_<ordine>.pdf        un'etichetta 100×150 mm per scatolone (riepilogo
+                                   interno, NON sostituisce l'etichetta del corriere)
     dhl_draft_<ordine>.json       payload MyDHL API pronto per la validazione
 
 Regole (censimento 26/08):
@@ -44,9 +47,9 @@ CONFEZIONI = {
     "TCAP075":   {"WP50": (12, 1100, "derivato"),  "WP40": (6,   600, "derivato")},
     "CANT200":   {"WP50": (12, 2850, "censimento"),"WP40": (6,  1500, "censimento")},
     "BRUT150":   {"WP50": (12, 2250, "censimento"),"WP40": (6,  1200, "censimento")},
-    "VPBUST08":  {"WP50": (12, 2250, "censimento"),"WP40": (6,  1200, "censimento")},
+    "VP08BUST":  {"WP50": (12, 2250, "censimento"),"WP40": (6,  1200, "censimento")},
     "BOXOV":     {                                 "WP40": (6,  1450, "censimento")},
-    "SCAT08V20": {                                 "WP40": (6,  1450, "censimento")},
+    "SCAT20V08": {                                 "WP40": (6,  1450, "censimento")},
     # scatole regalo/Natale (6/WP40, 1.100 g conf.5 — SKU da confermare):
     # "SCATR05A":  {"WP40": (6, 1100, "censimento")},
 }
@@ -112,7 +115,47 @@ def cartonize_order(rows):
 
 
 # ----------------------------------------------------------------------------
-# ETICHETTE PDF — 100×150 mm, una per scatolone
+# ETICHETTE COLLO INTERNO — una per ogni scatola WP50/WP40, con lotto e
+# quantità. Questa è l'etichetta che conta ai fini di tracciabilità: va
+# applicata sulla scatola interna PRIMA di chiuderla nello scatolone.
+# In Fase 1 lotto/scadenza sono placeholder: il dato reale arriva dal
+# miniMRP e va stampato a fine linea (Fase 2), non calcolato qui.
+# ----------------------------------------------------------------------------
+def make_inner_labels(order, result, out_path: Path):
+    from reportlab.lib.units import mm
+    from reportlab.pdfgen import canvas
+    from reportlab.graphics.barcode import code128
+
+    W, H = 60 * mm, 40 * mm   # formato ridotto, pensato per la scatola interna
+    c = canvas.Canvas(str(out_path), pagesize=(W, H))
+    colli = [item for carton in result["scatoloni"] for item in carton["contenuto"]]
+    n_tot = len(colli)
+    for i, item in enumerate(colli, 1):
+        y = H - 6 * mm
+        c.setFont("Helvetica-Bold", 11); c.drawCentredString(W / 2, y, "VISCOTTA")
+        y -= 5 * mm
+        c.setFont("Helvetica-Bold", 9)
+        c.drawString(4 * mm, y, f"{item['sku']}  ({item['formato']})")
+        y -= 4.5 * mm
+        c.setFont("Helvetica", 8)
+        c.drawString(4 * mm, y, f"Quantità: {item['pezzi']} pz")
+        y -= 4.5 * mm
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(4 * mm, y, "Lotto: __________  Scad.: __________")
+        y -= 5 * mm
+        c.setFont("Helvetica", 6)
+        c.drawString(4 * mm, y, f"Ordine {order['order_number']} — {order['cliente'][:24]}")
+        bc = code128.Code128(f"{order['order_number']}-{i:02d}", barHeight=6 * mm, barWidth=0.2 * mm)
+        bc.drawOn(c, (W - bc.width) / 2, 2 * mm)
+        c.showPage()
+    c.save()
+
+
+# ----------------------------------------------------------------------------
+# ETICHETTA SCATOLONE — 100×150 mm, una per scatolone. Riepilogo interno di
+# cosa contiene il collo di spedizione: NON è l'etichetta ufficiale del
+# corriere (quella la emette DHL/BRT su quel collo alla creazione della
+# spedizione) e non sostituisce le etichette dei singoli WP50/WP40.
 # ----------------------------------------------------------------------------
 def make_labels(order, result, out_path: Path):
     from reportlab.lib.units import mm
@@ -151,7 +194,7 @@ def make_labels(order, result, out_path: Path):
         c.drawRightString(W - 8 * mm, y, f"Collo {i}/{n_tot}")
         y -= 7 * mm
         c.setFont("Helvetica", 7)
-        c.drawString(8 * mm, y, "Lotto / scadenza: __________ (Fase 2 — stampa a fine linea)")
+        c.drawString(8 * mm, y, "Riepilogo interno — non sostituisce l'etichetta del corriere")
         bc = code128.Code128(f"{order['order_number']}-{i:02d}", barHeight=13 * mm, barWidth=0.33 * mm)
         bc.drawOn(c, (W - bc.width) / 2, 8 * mm)
         c.showPage()
@@ -225,6 +268,7 @@ def main():
         result = cartonize_order(rows)
         summary[order_number] = {**order, **result}
         if result["n_scatoloni"]:
+            make_inner_labels(order, result, out / f"etichette_colli_{order_number}.pdf")
             make_labels(order, result, out / f"etichette_{order_number}.pdf")
             (out / f"dhl_draft_{order_number}.json").write_text(
                 json.dumps(make_dhl_draft(order, result), indent=2, ensure_ascii=False))

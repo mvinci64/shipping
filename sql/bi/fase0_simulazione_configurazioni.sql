@@ -256,9 +256,9 @@ WITH confezioni (sku, pz_wp50, pz_wp40, peso_wp50_kg, peso_wp40_kg) AS (
         ('TCAP075',   12,    6, NULL, NULL),
         ('CANT200',   12,    6, 2.85, 1.50),
         ('BRUT150',   12,    6, 2.25, 1.20),
-        ('VPBUST08',  12,    6, 2.25, 1.20),
+        ('VP08BUST',  12,    6, 2.25, 1.20),
         ('BOXOV',   NULL,    6, NULL, 1.45),   -- 220 g/pezzo, solo WP40
-        ('SCAT08V20', NULL,  6, NULL, 1.45)    -- 220 g/pezzo, solo WP40
+        ('SCAT20V08', NULL,  6, NULL, 1.45)    -- 220 g/pezzo, solo WP40
         -- scatole regalo/Natale: 6 per WP40 (conf. 5 paste 1,10 kg;
         -- conf. 10 paste 1,65 kg) — aggiungere gli SKU esatti
 ),

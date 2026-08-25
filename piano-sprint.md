@@ -1,0 +1,81 @@
+# Shipping — Piano sprint
+
+Piano di sviluppo a sprint per portare il dominio spedizioni da prototipo (`prototype/cartonize.py`) a servizio in produzione, secondo il percorso a fasi definito in `valutazione-cartonizzazione.md` (Fase 0 fatta, Fase 1 in corso, Fase 2/3 da avviare).
+
+Contesto: il sistema informativo VISCOTTA comprende quattro progetti, ciascuno con Claude Code — Order Portal (TS, IDEA), miniMRP (Python, PyCharm), BI (Python, PyCharm), Shipping (questo repo). Shipping dipende dal Portal per anagrafica clienti/ordini e dal miniMRP per lotto/scadenza a fine linea; non li modifica.
+
+Durata sprint indicativa: 2 settimane. Le stime vanno adattate al fatto che oggi produzione+packaging+spedizione sono le stesse 3 persone.
+
+---
+
+## Sprint 1 — Consolidare Fase 1 e scaffolding FastAPI
+
+Obiettivo: chiudere i punti aperti dell'anagrafica configurazioni e avere `shipping-api` come progetto FastAPI reale, con la logica di `cartonize.py` esposta come endpoint.
+
+- Finalizzare `sql/anagrafica_configurazioni.sql` / `sql/fase1_seed_censimento.sql`: SKU scatole regalo/Natale, tara scatolone pesata (oggi stimata 400 g), pesature dei colli marcati `derivato` (vista `vw_peso_confezione`)
+- Confermare con il team lo stato ordine da cartonizzare (oggi filtro `status = 'submitted'` in Q6 — verificare che corrisponda a "in prenotazione")
+- Scaffold `shipping-api/` (FastAPI, struttura cartelle, `pyproject.toml`/venv, connessione PostgreSQL schema `viscotta`, `GET /health`)
+- Portare la logica di cartonizzazione di `cartonize.py` in `POST /cartonizzazioni` (input: ordine o lista ordini; output: scatoloni + pesi, stesso formato di `out/cartonizzazione.json`)
+- Portare la generazione etichette **per collo interno** (WP50/WP40, lotto+quantità — `make_inner_labels` nel prototipo) come endpoint separato: è l'etichetta che conta ai fini di tracciabilità, distinta dal riepilogo scatolone e dall'etichetta ufficiale del corriere (DHL/BRT)
+- Test di non regressione: confronto output tra endpoint e prototipo su `ordini_esempio.csv`
+
+Dipendenze: nessuna esterna. Bloccante per tutti gli sprint successivi.
+
+## Sprint 2 — Macchina a stati spedizione + adapter corriere (bozza)
+
+Obiettivo: introdurre lo stato "bozza spedizione" nel dominio Shipping e il primo adapter corriere funzionante end-to-end in modalità draft.
+
+- Modellare la FSM `bozza → confermata → ritirata` (tabella `spedizioni` o simile, coerente con le convenzioni SQL del progetto)
+- Adapter BRT (ha un flusso draft nativo: `createShipment` provvisoria → `confirmShipment`/`deleteShipment`) — partire da qui perché non dipende dalle credenziali DHL, oggi non disponibili
+- Interfaccia comune "corriere" dietro cui BRT e (in seguito) DHL sono intercambiabili
+- Endpoint `POST /spedizioni` (crea bozza da una cartonizzazione), `POST /spedizioni/{id}/conferma`, `DELETE /spedizioni/{id}`
+- Adapter DHL MyDHL: solo se le credenziali arrivano in tempo, altrimenti si sposta al backlog del prossimo sprint (Basic Auth, flusso emulato: validazione senza etichetta → creazione reale alla conferma)
+
+Dipendenze: credenziali MyDHL API + account number (da referente DHL, non ancora disponibili) — rischio di slittamento della parte DHL, non della parte BRT.
+
+## Sprint 3 — Etichette con lotto reale ed endpoint operativo (avvio Fase 2)
+
+Obiettivo: spostare la generazione etichette a valle del miniMRP, con lotto/scadenza reali, e dare al reparto un endpoint per confermare i colli in produzione.
+
+- Recuperare lotto/scadenza dalle tabelle miniMRP (`ordini_produzione`) al momento della stampa, non in cartonizzazione
+- Stampa a fine linea delle etichette **collo interno** (WP50/WP40) con lotto/scadenza reali — sostituiscono i placeholder del prototipo
+- Etichetta scatolone (100×150, riepilogo interno) con dati reali, resta comunque distinta dall'etichetta ufficiale del corriere
+- Endpoint per il reparto: conferma collo/scansione a fine linea, aggiornamento stato spedizione
+- Generare il contratto OpenAPI da FastAPI e il client TS derivato (per uso da `shipping-web` e potenzialmente dal Portal)
+
+Dipendenze: Sprint 2 completato (FSM spedizione); accesso in lettura alle tabelle miniMRP rilevanti.
+
+## Sprint 4 — `shipping-web` MVP
+
+Obiettivo: prima interfaccia operativa di reparto, sostituendo l'uso diretto di `cartonize.py` da riga di comando.
+
+- Scaffold `shipping-web/` (TS/React), client generato dall'OpenAPI di `shipping-api`
+- Vista lista ordini da spedire con stato (bozza/confermata/ritirata)
+- Azione di conferma spedizione e stampa etichetta dalla UI
+- Autenticazione/permessi coerenti con l'Order Portal (stesso modello RBAC admin/agent/customer, o sottoinsieme rilevante per il reparto)
+
+Dipendenze: Sprint 3 completato (contratto OpenAPI stabile).
+
+## Sprint 5 — Hardening e rollout
+
+Obiettivo: passare da MVP funzionante a servizio affidabile in produzione.
+
+- Gestione errori corriere (timeout, rifiuto indirizzo, retry) e stato "fallita" nella FSM
+- Log/audit delle spedizioni per troubleshooting
+- Validazione finale di tutte le pesature reali (colli `derivato` → censiti)
+- Deploy (allineato al Portal, es. AWS AppRunner), health check, variabili d'ambiente validate
+
+Dipendenze: Sprint 4 completato.
+
+---
+
+## Rischi e punti aperti che condizionano la sequenza
+
+| Punto aperto | Impatto | Sprint interessato |
+|---|---|---|
+| Credenziali MyDHL API + account number non disponibili | Adapter DHL rimandabile, si parte da BRT | Sprint 2 |
+| Tara e dimensioni reali dello scatolone da pesare | Pesi in etichetta approssimati finché non pesato | Sprint 1 |
+| Pesature dei colli marcati `derivato` | Alcuni pesi restano "da verificare" in etichetta | Sprint 1, Sprint 5 |
+| SKU definitivi scatole regalo/Natale | Cartonizzazione di quei prodotti resta incompleta | Sprint 1 |
+| Conferma stato ordine "in prenotazione" (`status = 'submitted'`) | Rischio di cartonizzare ordini nello stato sbagliato | Sprint 1 |
+| Team produzione+packaging+spedizione condiviso (3 persone) | Il coordinamento implicito oggi va reso esplicito nel sistema — impatta UX di Sprint 4 | Sprint 4 |
