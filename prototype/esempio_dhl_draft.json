@@ -1,0 +1,82 @@
+{
+  "plannedShippingDateAndTime": "2026-09-10T09:00:00 GMT+02:00",
+  "pickup": {
+    "isRequested": false
+  },
+  "productCode": "N",
+  "accounts": [
+    {
+      "typeCode": "shipper",
+      "number": "<<DHL_ACCOUNT_NUMBER>>"
+    }
+  ],
+  "customerDetails": {
+    "shipperDetails": {
+      "postalAddress": {
+        "postalCode": "<<CAP>>",
+        "cityName": "<<CITTA>>",
+        "countryCode": "IT",
+        "addressLine1": "<<INDIRIZZO VISCOTTA>>"
+      },
+      "contactInformation": {
+        "companyName": "VISCOTTA",
+        "fullName": "Spedizioni VISCOTTA",
+        "phone": "<<TELEFONO>>",
+        "email": "<<EMAIL>>"
+      }
+    },
+    "receiverDetails": {
+      "postalAddress": {
+        "postalCode": "<<CAP_CLIENTE>>",
+        "cityName": "<<CITTA_CLIENTE>>",
+        "countryCode": "IT",
+        "addressLine1": "<<INDIRIZZO_CLIENTE>>"
+      },
+      "contactInformation": {
+        "companyName": "Gastronomia Belfiore SRL",
+        "fullName": "Gastronomia Belfiore SRL",
+        "phone": "<<TELEFONO_CLIENTE>>",
+        "email": "<<EMAIL_CLIENTE>>"
+      }
+    }
+  },
+  "content": {
+    "packages": [
+      {
+        "customerReferences": [
+          {
+            "value": "ORD-2026-0812-01"
+          }
+        ],
+        "weight": 4.3,
+        "dimensions": {
+          "length": 40,
+          "width": 30,
+          "height": 30
+        }
+      },
+      {
+        "customerReferences": [
+          {
+            "value": "ORD-2026-0812-02"
+          }
+        ],
+        "weight": 4.22,
+        "dimensions": {
+          "length": 40,
+          "width": 30,
+          "height": 30
+        }
+      }
+    ],
+    "isCustomsDeclarable": false,
+    "description": "Prodotti da forno — ordine ORD-2026-0812",
+    "incoterm": "DAP",
+    "unitOfMeasurement": "metric"
+  },
+  "customerReferences": [
+    {
+      "value": "ORD-2026-0812"
+    }
+  ]
+}

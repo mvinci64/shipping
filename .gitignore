@@ -1,0 +1,27 @@
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+*.egg-info/
+
+# Node (per il futuro shipping-web)
+node_modules/
+dist/
+
+# Output generati dal prototipo
+prototype/out/
+
+# macOS / Office
+.DS_Store
+~$*
+
+# Segreti e configurazioni locali (credenziali DHL/BRT, DB)
+.env
+*.local
+credentials*.json

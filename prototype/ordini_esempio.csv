@@ -1,0 +1,8 @@
+order_number,cliente,data_consegna,sku,qta
+ORD-2026-0812,Gastronomia Belfiore SRL,2026-09-10,CHMS50,60
+ORD-2026-0812,Gastronomia Belfiore SRL,2026-09-10,TCAP075,18
+ORD-2026-0812,Gastronomia Belfiore SRL,2026-09-10,BOXOV,10
+ORD-2026-0812,Gastronomia Belfiore SRL,2026-09-10,XNATALE,5
+ORD-2026-0815,Enoteca Partenope,2026-09-10,GRM100,48
+ORD-2026-0815,Enoteca Partenope,2026-09-10,CANT200,24
+ORD-2026-0815,Enoteca Partenope,2026-09-10,BRUT150,12
