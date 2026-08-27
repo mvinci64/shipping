@@ -12,6 +12,9 @@ rischiare di emettere spedizioni reali da un endpoint di prova.
 import os
 
 import requests
+from dotenv import load_dotenv
+
+load_dotenv()
 
 BASE_URL = "https://express.api.dhl.com/mydhlapi"
 
