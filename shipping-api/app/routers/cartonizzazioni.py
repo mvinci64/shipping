@@ -1,8 +1,11 @@
+import datetime
+
 from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel
 
 from app import db
 from app.cartonize import cartonize_order
+from app.day_plan import make_day_plan_pdf
 from app.labels import make_inner_labels_pdf
 
 router = APIRouter()
@@ -93,4 +96,25 @@ def etichette_colli_ordine_reale(order_number: str) -> Response:
         content=pdf,
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="etichette_colli_{order_number}.pdf"'},
+    )
+
+
+@router.get("/cartonizzazioni/piano-giorno/{data_consegna}")
+def piano_giorno(data_consegna: datetime.date) -> Response:
+    """Piano di cartonizzazione del giorno: un PDF A4, 4 ordini per pagina
+    (2×2, linee di taglio), da stampare e allegare fisicamente a ogni ordine
+    in laboratorio — documento ufficiale pre-produzione. Un ordine per
+    ritaglio: le etichette collo WP50/WP40 (lotto/scadenza reali) arrivano
+    dopo, a produzione fatta."""
+    ordini = db.fetch_orders_by_delivery_date(data_consegna)
+    if not ordini:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Nessun ordine 'submitted' con consegna {data_consegna.isoformat()}",
+        )
+    pdf = make_day_plan_pdf(data_consegna.isoformat(), ordini)
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="piano_{data_consegna.isoformat()}.pdf"'},
     )

@@ -54,3 +54,34 @@ def fetch_order(order_number: str) -> dict | None:
         "cliente": cliente,
         "righe": [{"sku": sku, "qta": float(qta)} for sku, qta in righe],
     }
+
+
+def fetch_orders_by_delivery_date(data_consegna) -> list[dict]:
+    """Tutti gli ordini 'submitted' con questa data di consegna richiesta —
+    stesso filtro di vw_lotto_suggerito / Q6 (le "prenotazioni" del giorno).
+    Un dict per ordine, righe sku/qta incluse (stessa forma di fetch_order)."""
+    with get_connection() as conn:
+        ordini = conn.execute(
+            """
+            SELECT o.id, o.order_number, c.company_name
+            FROM viscotta.orders o
+            JOIN viscotta.customers c ON c.id = o.customer_id
+            WHERE o.status = 'submitted'
+              AND o.requested_delivery_date = %s
+            ORDER BY o.order_number
+            """,
+            (data_consegna,),
+        ).fetchall()
+
+        risultato = []
+        for order_id, order_number, cliente in ordini:
+            righe = conn.execute(
+                "SELECT sku, quantity FROM viscotta.order_items WHERE order_id = %s",
+                (order_id,),
+            ).fetchall()
+            risultato.append({
+                "order_number": order_number,
+                "cliente": cliente,
+                "righe": [{"sku": sku, "qta": float(qta)} for sku, qta in righe],
+            })
+    return risultato

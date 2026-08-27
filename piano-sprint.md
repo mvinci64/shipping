@@ -63,9 +63,29 @@ Obiettivo: passare da MVP funzionante a servizio affidabile in produzione.
 - Gestione errori corriere (timeout, rifiuto indirizzo, retry) e stato "fallita" nella FSM
 - Log/audit delle spedizioni per troubleshooting
 - Validazione finale di tutte le pesature reali (colli `derivato` → censiti)
-- Deploy (allineato al Portal, es. AWS AppRunner), health check, variabili d'ambiente validate
+- Deploy in produzione secondo la strategia sotto (già preparata per `shipping-api` allo Sprint 1: `Dockerfile`, `ecs-task-definition.template.json`)
 
 Dipendenze: Sprint 4 completato.
+
+---
+
+## Strategia di deploy AWS
+
+Stesso account AWS (`025066246989`, `eu-central-1`) e stesso RDS condiviso (`database-hai...rds.amazonaws.com`) degli altri tre componenti VISCOTTA. Pattern verificati sui repo reali:
+
+| Componente | Stack | Deploy |
+|---|---|---|
+| Order Portal | Next.js/TS | **AppRunner** source-based (`AppRunner.yaml`, `npm run build`/`npm start`), porta 3000, health `/api/health` |
+| miniMRP | Python/Streamlit | **Docker → ECR → ECS Fargate**, porta 8501, secrets da **SSM Parameter Store**, log CloudWatch |
+| BI/Metabase | immagine ufficiale Metabase | **ECS Fargate**, porta 3000, secrets da **Secrets Manager** |
+| ETL BI | Python | non in cloud — gira su scheduler Windows di un desktop lab (nota aperta, fuori scope Shipping) |
+
+Decisione per Shipping:
+
+- **`shipping-api`** (Python/FastAPI) → stesso pattern di **miniMRP**: Docker → ECR → ECS Fargate. Preparati allo Sprint 1: `shipping-api/Dockerfile` (build e healthcheck verificati in locale), `shipping-api/ecs-task-definition.template.json` (family `viscotta-shipping-api`, porta 8000, `DATABASE_URL` da SSM `/viscotta/shipping-api/DATABASE_URL`, log group `/ecs/viscotta-shipping-api`).
+- **`shipping-web`** (TS/React, Sprint 4) → stesso pattern del **Portal**: AppRunner source-based, nessun Docker/ECS.
+
+Da fare quando si passa al deploy reale (fuori scope finché non ci sono ambienti AWS dedicati): creare repo ECR `viscotta-shipping-api`, ruolo IAM `viscotta-shipping-api-task-role`, parametro SSM con la connection string reale, servizio ECS + load balancer/target group.
 
 ---
 
