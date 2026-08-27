@@ -16,7 +16,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-BASE_URL = "https://express.api.dhl.com/mydhlapi"
+# DHL_API_BASE_URL sovrascrive l'URL — utile finché l'app è in sandbox
+# (approvazione produzione "pending"): il default resta l'host di
+# produzione, ma va puntato all'ambiente test finché l'account non è
+# attivo, per non rischiare di usare per sbaglio le chiavi sbagliate
+# sull'host sbagliato.
+BASE_URL = os.environ.get("DHL_API_BASE_URL", "https://express.api.dhl.com/mydhlapi")
 
 ORIGIN_COUNTRY_CODE = os.environ.get("DHL_ORIGIN_COUNTRY_CODE", "IT")
 ORIGIN_POSTAL_CODE = os.environ.get("DHL_ORIGIN_POSTAL_CODE", "")
