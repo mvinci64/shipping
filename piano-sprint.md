@@ -94,7 +94,7 @@ Da fare quando si passa al deploy reale (fuori scope finché non ci sono ambient
 | Punto aperto | Impatto | Sprint interessato |
 |---|---|---|
 | Credenziali MyDHL API + account number non disponibili | Adapter DHL rimandabile, si parte da BRT | Sprint 2 |
-| Tara e dimensioni reali dello scatolone da pesare | Pesi in etichetta approssimati finché non pesato | Sprint 1 |
+| ~~Tara e dimensioni reali dello scatolone da pesare~~ — pesata 27/08/2026: 250 g | Risolto | Sprint 1 |
 | Pesature dei colli marcati `derivato` | Alcuni pesi restano "da verificare" in etichetta | Sprint 1, Sprint 5 |
 | SKU definitivi scatole regalo/Natale | Cartonizzazione di quei prodotti resta incompleta | Sprint 1 |
 | Conferma stato ordine "in prenotazione" (`status = 'submitted'`) | Rischio di cartonizzare ordini nello stato sbagliato | Sprint 1 |

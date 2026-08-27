@@ -6,7 +6,7 @@ non censiti vengono segnalati come tali.
 """
 import math
 
-TARA_SCATOLONE_G = 400        # DA PESARE
+TARA_SCATOLONE_G = 250        # pesato 27/08/2026
 POSTI_SCATOLONE = 6
 POSTI = {"WP50": 2, "WP40": 1}
 

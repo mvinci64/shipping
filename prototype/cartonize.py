@@ -32,7 +32,7 @@ from collections import defaultdict
 # fonte 'censimento' = pesata dichiarata; 'derivato' = grammatura SKU + tara,
 # DA VERIFICARE con bilancia prima dell'uso in etichetta legale.
 # ----------------------------------------------------------------------------
-TARA_SCATOLONE_G = 400        # DA PESARE
+TARA_SCATOLONE_G = 250        # pesato 27/08/2026
 POSTI_SCATOLONE = 6           # 6 posti WP40; 1 WP50 = 2 posti
 POSTI = {"WP50": 2, "WP40": 1}
 
