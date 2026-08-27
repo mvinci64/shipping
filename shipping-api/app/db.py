@@ -56,6 +56,32 @@ def fetch_order(order_number: str) -> dict | None:
     }
 
 
+def fetch_destinatario(order_number: str) -> dict | None:
+    """Indirizzo di spedizione del cliente per un ordine reale. None se
+    l'ordine non esiste. shipping_address è testo libero (via + CAP in
+    coda, es. "Via Rossi 1, 18035"); city/province/country sono colonne
+    separate — parsing del CAP a carico del chiamante."""
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT c.shipping_address, c.city, c.province, c.country
+            FROM viscotta.orders o
+            JOIN viscotta.customers c ON c.id = o.customer_id
+            WHERE o.order_number = %s
+            """,
+            (order_number,),
+        ).fetchone()
+    if row is None:
+        return None
+    indirizzo, citta, provincia, paese = row
+    return {
+        "indirizzo": indirizzo,
+        "citta": citta,
+        "provincia": provincia,
+        "paese": paese,
+    }
+
+
 def fetch_orders_by_delivery_date(data_consegna) -> list[dict]:
     """Tutti gli ordini realmente 'in prenotazione' con questa data di consegna
     richiesta — stesso filtro di vw_lotto_suggerito / Q6. "In prenotazione"
