@@ -270,7 +270,8 @@ righe AS (
     LEFT JOIN viscotta.customers cu ON cu.id = o.customer_id
     JOIN viscotta.order_items r ON r.order_id = o.id
     JOIN viscotta.products p    ON p.id = r.product_id
-    WHERE o.status = 'submitted'   -- "in prenotazione": adattare allo stato reale
+    WHERE o.status = 'submitted'
+      AND o.crm_opportunity_id IS NOT NULL   -- "in prenotazione" = submitted E arrivato come Opportunity in CRM
     GROUP BY o.id, o.order_number, o.requested_delivery_date, cu.company_name, p.sku
 ),
 calcolo AS (

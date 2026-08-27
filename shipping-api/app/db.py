@@ -57,8 +57,12 @@ def fetch_order(order_number: str) -> dict | None:
 
 
 def fetch_orders_by_delivery_date(data_consegna) -> list[dict]:
-    """Tutti gli ordini 'submitted' con questa data di consegna richiesta —
-    stesso filtro di vw_lotto_suggerito / Q6 (le "prenotazioni" del giorno).
+    """Tutti gli ordini realmente 'in prenotazione' con questa data di consegna
+    richiesta — stesso filtro di vw_lotto_suggerito / Q6. "In prenotazione"
+    richiede sia status='submitted' sia un riscontro reale in CRM
+    (crm_opportunity_id valorizzato): esistono ordini submitted con
+    crm_export_status='exported' ma senza crm_opportunity_id, cioè mai
+    arrivati a diventare un'Opportunity in CRM — non vanno cartonizzati.
     Un dict per ordine, righe sku/qta incluse (stessa forma di fetch_order)."""
     with get_connection() as conn:
         ordini = conn.execute(
@@ -67,6 +71,7 @@ def fetch_orders_by_delivery_date(data_consegna) -> list[dict]:
             FROM viscotta.orders o
             JOIN viscotta.customers c ON c.id = o.customer_id
             WHERE o.status = 'submitted'
+              AND o.crm_opportunity_id IS NOT NULL
               AND o.requested_delivery_date = %s
             ORDER BY o.order_number
             """,

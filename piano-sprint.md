@@ -97,5 +97,5 @@ Da fare quando si passa al deploy reale (fuori scope finché non ci sono ambient
 | ~~Tara e dimensioni reali dello scatolone da pesare~~ — pesata 27/08/2026: 250 g | Risolto | Sprint 1 |
 | Pesature dei colli marcati `derivato` | Alcuni pesi restano "da verificare" in etichetta | Sprint 1, Sprint 5 |
 | SKU definitivi scatole regalo/Natale | Cartonizzazione di quei prodotti resta incompleta | Sprint 1 |
-| Conferma stato ordine "in prenotazione" (`status = 'submitted'`) | Rischio di cartonizzare ordini nello stato sbagliato | Sprint 1 |
+| ~~Conferma stato ordine "in prenotazione"~~ — confermato: `status = 'submitted'` E `crm_opportunity_id IS NOT NULL` (deve esistere l'Opportunity in CRM, non basta il submit sul Portal — 18 ordini storici erano `submitted`/`crm_export_status='exported'` ma senza Opportunity) | Risolto | Sprint 1 |
 | Team produzione+packaging+spedizione condiviso (3 persone) | Il coordinamento implicito oggi va reso esplicito nel sistema — impatta UX di Sprint 4 | Sprint 4 |
