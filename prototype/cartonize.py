@@ -44,6 +44,12 @@ CONFEZIONI = {
     "CMEN080":   {"WP50": (24, 2120, "derivato"),  "WP40": (12, 1110, "derivato")},
     "MCIOC080":  {"WP50": (24, 2120, "derivato"),  "WP40": (12, 1110, "derivato")},
     "MSAL080":   {"WP50": (24, 2120, "derivato"),  "WP40": (12, 1110, "derivato")},
+    # peso netto (24x150=3.600 g, 12x150=1.800 g) + tara WP50 200 g / WP40 150 g
+    "MPEL150":   {"WP50": (24, 3800, "derivato"),  "WP40": (12, 1950, "derivato")},
+    "MSGU150":   {"WP50": (24, 3800, "derivato"),  "WP40": (12, 1950, "derivato")},
+    # peso netto (24x200=4.800 g, 12x200=2.400 g) + tara WP50 200 g / WP40 150 g
+    "MPEL200":   {"WP50": (24, 5000, "derivato"),  "WP40": (12, 2550, "derivato")},
+    "MSGU200":   {"WP50": (24, 5000, "derivato"),  "WP40": (12, 2550, "derivato")},
     "TCAP075":   {"WP50": (12, 1100, "derivato"),  "WP40": (6,   600, "derivato")},
     "CANT200":   {"WP50": (12, 2850, "censimento"),"WP40": (6,  1500, "censimento")},
     "BRUT150":   {"WP50": (12, 2250, "censimento"),"WP40": (6,  1200, "censimento")},

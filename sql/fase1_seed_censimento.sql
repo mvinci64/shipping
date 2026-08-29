@@ -38,6 +38,16 @@ WITH dati (sku, imballo, pezzi, peso_netto_g, peso_collo_noto_g) AS (
         ('MCIOC080',  'WP40', 12,  960.0, NULL),
         ('MSAL080',   'WP50', 24, 1920.0, NULL),
         ('MSAL080',   'WP40', 12,  960.0, NULL),
+        -- prodotti nuovi (28/08): stesso comportamento di MSAL080 a livello
+        -- di pezzi/collo; peso netto da grammatura 150 g / 200 g dichiarata
+        ('MPEL150',   'WP50', 24, 3600.0, NULL),
+        ('MPEL150',   'WP40', 12, 1800.0, NULL),
+        ('MSGU150',   'WP50', 24, 3600.0, NULL),
+        ('MSGU150',   'WP40', 12, 1800.0, NULL),
+        ('MPEL200',   'WP50', 24, 4800.0, NULL),
+        ('MPEL200',   'WP40', 12, 2400.0, NULL),
+        ('MSGU200',   'WP50', 24, 4800.0, NULL),
+        ('MSGU200',   'WP40', 12, 2400.0, NULL),
         -- tortine capresi: 12 in WP50, 6 in WP40
         ('TCAP075',   'WP50', 12,  900.0, NULL),
         ('TCAP075',   'WP40',  6,  450.0, NULL),
@@ -73,7 +83,8 @@ ON CONFLICT (prodotto_id, imballo_interno_id, valido_dal) DO UPDATE
 -- (da creare nel catalogo Portal, o da correggere qui se il codice è cambiato)
 WITH sku_censiti (sku) AS (
     VALUES ('CHMS50'), ('GRM100'), ('CANTS100'), ('CMEN080'), ('MCIOC080'),
-           ('MSAL080'), ('TCAP075'), ('CANT200'), ('BRUT150'), ('VP08BUST'),
+           ('MSAL080'), ('MPEL150'), ('MSGU150'), ('MPEL200'), ('MSGU200'),
+           ('TCAP075'), ('CANT200'), ('BRUT150'), ('VP08BUST'),
            ('BOXOV'), ('SCAT20V08')
 )
 SELECT sc.sku AS sku_senza_prodotto_portal
