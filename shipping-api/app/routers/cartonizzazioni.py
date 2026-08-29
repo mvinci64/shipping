@@ -88,10 +88,14 @@ def cartonizzazione_ordine_reale(order_number: str) -> RisultatoCartonizzazione:
 
 @router.get("/cartonizzazioni/{order_number}/etichette-colli")
 def etichette_colli_ordine_reale(order_number: str) -> Response:
-    """Etichette collo (WP50/WP40) per un ordine reale, letto dal DB."""
+    """Etichette collo (WP50/WP40) per un ordine reale, letto dal DB.
+    Lotto/scadenza reali da easyfatt.tmovmagazz (ultimo carico per SKU);
+    se uno SKU non ha mai avuto un carico in EasyFatt resta il placeholder."""
     ordine = _ordine_reale(order_number)
     result = cartonize_order(ordine["righe"])
-    pdf = make_inner_labels_pdf(order_number, ordine["cliente"], result)
+    skus = {item["sku"] for carton in result["scatoloni"] for item in carton["contenuto"]}
+    lotti = {sku: lotto for sku in skus if (lotto := db.fetch_ultimo_lotto(sku)) is not None}
+    pdf = make_inner_labels_pdf(order_number, ordine["cliente"], result, lotti)
     return Response(
         content=pdf,
         media_type="application/pdf",

@@ -82,6 +82,31 @@ def fetch_destinatario(order_number: str) -> dict | None:
     }
 
 
+def fetch_ultimo_lotto(sku: str) -> dict | None:
+    """Ultimo lotto prodotto per uno SKU, da easyfatt.tmovmagazz (il gestionale,
+    non miniMRP: viscotta.ordini_produzione non ha lotto/scadenza affidabili,
+    solo order_number/note libere). Si produce fresco su ordine, quindi
+    l'ultimo movimento di carico (qtacaricata) per l'articolo è il lotto
+    dell'ordine corrente — niente FEFO su giacenza aggregata. None se lo SKU
+    non esiste in easyfatt o non ha mai avuto un carico."""
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT m.lotto, m.datascadenza
+            FROM easyfatt.tmovmagazz m
+            JOIN easyfatt.tarticoli a ON a.idarticolo = m.idarticolo
+            WHERE a.codarticolo = %s AND m.qtacaricata IS NOT NULL
+            ORDER BY m.data DESC, m.numproduz DESC NULLS LAST
+            LIMIT 1
+            """,
+            (sku,),
+        ).fetchone()
+    if row is None:
+        return None
+    lotto, scadenza = row
+    return {"lotto": lotto, "scadenza": scadenza.isoformat() if scadenza else None}
+
+
 def fetch_orders_by_delivery_date(data_consegna) -> list[dict]:
     """Tutti gli ordini realmente 'in prenotazione' con questa data di consegna
     richiesta — stesso filtro di vw_lotto_suggerito / Q6. "In prenotazione"

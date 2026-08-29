@@ -2,9 +2,11 @@
 
 Una etichetta per ogni scatola interna, con lotto e quantità: è quella che
 conta ai fini di tracciabilità (va applicata sulla scatola interna PRIMA di
-chiuderla nello scatolone). Lotto/scadenza sono placeholder qui: il dato
-reale arriva da viscotta.ordini_produzione (miniMRP) e va stampato a fine
-linea — vedi Fase 2 in piano-sprint.md.
+chiuderla nello scatolone). Lotto/scadenza reali arrivano da
+easyfatt.tmovmagazz (ultimo carico per SKU — vedi db.fetch_ultimo_lotto),
+non da viscotta.ordini_produzione (miniMRP), che non li ha in campo
+strutturato. Senza il dict `lotti` (es. ordini di test via CSV, senza
+riscontro in EasyFatt) resta il placeholder da compilare a mano.
 
 NON genera l'etichetta scatolone: quella è un riepilogo interno separato,
 e non sostituisce comunque l'etichetta ufficiale del corriere (DHL/BRT).
@@ -12,7 +14,7 @@ e non sostituisce comunque l'etichetta ufficiale del corriere (DHL/BRT).
 import io
 
 
-def make_inner_labels_pdf(order_number: str, cliente: str, result: dict) -> bytes:
+def make_inner_labels_pdf(order_number: str, cliente: str, result: dict, lotti: dict | None = None) -> bytes:
     from reportlab.lib.units import mm
     from reportlab.pdfgen import canvas
     from reportlab.graphics.barcode import code128
@@ -32,7 +34,11 @@ def make_inner_labels_pdf(order_number: str, cliente: str, result: dict) -> byte
         c.drawString(4 * mm, y, f"Quantità: {item['pezzi']} pz")
         y -= 4.5 * mm
         c.setFont("Helvetica-Bold", 8)
-        c.drawString(4 * mm, y, "Lotto: __________  Scad.: __________")
+        lotto = (lotti or {}).get(item["sku"])
+        if lotto:
+            c.drawString(4 * mm, y, f"Lotto: {lotto['lotto']}  Scad.: {lotto['scadenza']}")
+        else:
+            c.drawString(4 * mm, y, "Lotto: __________  Scad.: __________")
         y -= 5 * mm
         c.setFont("Helvetica", 6)
         c.drawString(4 * mm, y, f"Ordine {order_number} — {cliente[:24]}")

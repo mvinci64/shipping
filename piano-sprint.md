@@ -35,10 +35,10 @@ Dipendenze: credenziali MyDHL API + account number (da referente DHL, non ancora
 
 ## Sprint 3 — Etichette con lotto reale ed endpoint operativo (avvio Fase 2)
 
-Obiettivo: spostare la generazione etichette a valle del miniMRP, con lotto/scadenza reali, e dare al reparto un endpoint per confermare i colli in produzione.
+Obiettivo: spostare la generazione etichette a valle della produzione, con lotto/scadenza reali, e dare al reparto un endpoint per confermare i colli in produzione.
 
-- Recuperare lotto/scadenza dalle tabelle miniMRP (`ordini_produzione`) al momento della stampa, non in cartonizzazione
-- Stampa a fine linea delle etichette **collo interno** (WP50/WP40) con lotto/scadenza reali — sostituiscono i placeholder del prototipo
+- ~~Recuperare lotto/scadenza dalle tabelle miniMRP~~ — **corretto in corsa**: `viscotta.ordini_produzione` (miniMRP) non ha lotto/scadenza strutturati (`lotto_label` contiene in realtà l'order_number). Il dato reale vive in `easyfatt.tmovmagazz` (gestionale): si produce fresco su ordine, quindi l'ultimo movimento di carico (`qtacaricata`) per lo SKU è il lotto giusto — niente FEFO su giacenza aggregata. Implementato: `db.fetch_ultimo_lotto(sku)`
+- ~~Stampa a fine linea delle etichette **collo interno** (WP50/WP40) con lotto/scadenza reali~~ — fatto, `GET /cartonizzazioni/{order_number}/etichette-colli` ora stampa lotto/scadenza reali da EasyFatt invece del placeholder
 - Etichetta scatolone (100×150, riepilogo interno) con dati reali, resta comunque distinta dall'etichetta ufficiale del corriere
 - Endpoint per il reparto: conferma collo/scansione a fine linea, aggiornamento stato spedizione
 - Generare il contratto OpenAPI da FastAPI e il client TS derivato (per uso da `shipping-web` e potenzialmente dal Portal)
@@ -99,3 +99,5 @@ Da fare quando si passa al deploy reale (fuori scope finché non ci sono ambient
 | SKU definitivi scatole regalo/Natale | Cartonizzazione di quei prodotti resta incompleta | Sprint 1 |
 | ~~Conferma stato ordine "in prenotazione"~~ — confermato: `status = 'submitted'` E `crm_opportunity_id IS NOT NULL` (deve esistere l'Opportunity in CRM, non basta il submit sul Portal — 18 ordini storici erano `submitted`/`crm_export_status='exported'` ma senza Opportunity) | Risolto | Sprint 1 |
 | Team produzione+packaging+spedizione condiviso (3 persone) | Il coordinamento implicito oggi va reso esplicito nel sistema — impatta UX di Sprint 4 | Sprint 4 |
+| App developer.dhl.com in stato "pending" — nessuna produzione, ne sandbox funzionanti | `/spedizioni/valida` non chiamabile (401 sia in produzione che sandbox) | Sprint 2 |
+| Caso limite `fetch_ultimo_lotto`: produzione multipla dello stesso SKU nello stesso giorno per ordini diversi | Rischio di stampare il lotto di un altro ordine se non è davvero sempre "ultimo carico = questo ordine" — da verificare con chi segue EasyFatt | Sprint 3 |
