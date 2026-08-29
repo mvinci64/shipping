@@ -276,6 +276,7 @@ righe AS (
     JOIN viscotta.products p    ON p.id = r.product_id
     WHERE o.status = 'submitted'
       AND o.crm_opportunity_id IS NOT NULL   -- "in prenotazione" = submitted E arrivato come Opportunity in CRM
+      AND o.requested_delivery_date >= '2026-09-01'  -- esclude ordini/import storici, confondono la lettura
     GROUP BY o.id, o.order_number, o.requested_delivery_date, cu.company_name, p.sku
 ),
 calcolo AS (
