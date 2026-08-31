@@ -8,6 +8,7 @@ Sistema di cartonizzazione e spedizione VISCOTTA: dalle prenotazioni dell'Order 
 |---|---|
 | `valutazione-cartonizzazione.md` | Valutazione architetturale: le 4 opzioni, il percorso a fasi, modello dati e viste BI |
 | `piano-sprint.md` | Piano di sviluppo a sprint: da prototipo a `shipping-api` + `shipping-web` in produzione |
+| `procedura-giorno-produzione.md` | Sequenza operativa del giorno di produzione: produzione → EasyFatt → ETL BI → cartonizzazione → etichette → spedizione DHL, con i punti di coordinamento oggi impliciti |
 | `docs/` | Versioni Word: documento tecnico e versione divulgativa per il team di produzione |
 | `sql/anagrafica_configurazioni.sql` | DDL PostgreSQL dell'anagrafica configurazioni (Fase 1) + viste V1–V7 |
 | `sql/fase1_seed_censimento.sql` | Estensione DDL (modello a posti) + seed dal censimento imballi del 26/08 |
