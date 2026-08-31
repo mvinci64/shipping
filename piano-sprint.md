@@ -25,13 +25,15 @@ Dipendenze: nessuna esterna. Bloccante per tutti gli sprint successivi.
 
 Obiettivo: introdurre lo stato "bozza spedizione" nel dominio Shipping e il primo adapter corriere funzionante end-to-end in modalità draft.
 
-- ~~Modellare la FSM `bozza → confermata → ritirata`~~ — fatto: tabella `viscotta.spedizioni` (DDL in `sql/spedizioni_fsm.sql`, **da eseguire manualmente sul DB reale**, non ancora fatto — modifica strutturale su DB condiviso, eseguita a mano per scelta). Workflow implementato: `POST /spedizioni` crea bozza (solo quotazione, nessun effetto reale) → `POST /spedizioni/{id}/conferma` (effetto reale: crea spedizione+etichetta) → `POST /spedizioni/{id}/pickup` (effetto reale: prenota ritiro). Mai invio automatico diretto: ogni transizione con effetto reale richiede una chiamata esplicita
+- ~~Modellare la FSM `bozza → confermata → ritirata`~~ — fatto: tabella `viscotta.spedizioni` creata sul DB reale (`sql/spedizioni_fsm.sql`, eseguita a mano il 31/08/2026). Workflow implementato: `POST /spedizioni` crea bozza (solo quotazione, nessun effetto reale) → `POST /spedizioni/{id}/conferma` (effetto reale: crea spedizione+etichetta) → `POST /spedizioni/{id}/pickup` (effetto reale: prenota ritiro). Mai invio automatico diretto: ogni transizione con effetto reale richiede una chiamata esplicita. Testato end-to-end con TestClient su un ordine reale (`ORD-20260723-5969`): la bozza si crea, la conferma fallisce correttamente in stato `fallita` se il cliente non ha telefono in anagrafica (DHL lo richiede obbligatoriamente per `/shipments`) — vedi punto aperto sotto
 - Adapter BRT (ha un flusso draft nativo: `createShipment` provvisoria → `confirmShipment`/`deleteShipment`) — non ancora iniziato, resta da fare
 - Interfaccia comune "corriere" dietro cui BRT e (in seguito) DHL sono intercambiabili — non ancora fatto (oggi la FSM parla solo con `app/dhl.py` direttamente)
 - ~~Endpoint `POST /spedizioni` ... `DELETE /spedizioni/{id}`~~ — fatto, più `GET /spedizioni/{id}`, `GET /spedizioni/{id}/etichetta`, `POST /spedizioni/{id}/pickup` (non previsti nel piano originale, aggiunti per lo scope pickup confermato da Alessandro)
-- ~~Adapter DHL MyDHL~~ — fatto: tutte e tre le chiamate (`/rates`, `/shipments`, `/pickups`) implementate, testate con successo in ambiente `exp-mydhlapi-sandbox-all-m` e agganciate alla FSM
+- ~~Adapter DHL MyDHL~~ — fatto: tutte e tre le chiamate (`/rates`, `/shipments`, `/pickups`) implementate e testate con successo, prima in ambiente `exp-mydhlapi-sandbox-all-m` poi (31/08/2026) in **produzione** — Alessandro Menna ha verificato le chiamate di test e abilitato l'account `127990547`. `DHL_API_BASE_URL` ora punta a produzione, stesse credenziali
 
-Dipendenze: account `127990547` abilitato in produzione su MyDHL API (richiesta inviata ad Alessandro Menna il 31/08/2026, in attesa) — ambiente test già attivo e funzionante nel frattempo. DDL `spedizioni_fsm.sql` da eseguire manualmente prima che gli endpoint `/spedizioni` funzionino.
+Dipendenze: nessuna aperta — account `127990547` abilitato in produzione su MyDHL API il 31/08/2026. **Da qui in poi `crea_spedizione`/`richiedi_pickup` hanno sempre effetto reale** (costo reale, ritiro reale) — non richiamarle mai per prova, solo per un ordine vero.
+
+Punto aperto emerso dal test end-to-end: **molti clienti non hanno il telefono in anagrafica** (`viscotta.customers.phone`), campo obbligatorio per DHL su `/shipments` — la conferma di una spedizione fallisce (stato `fallita`, non un bug) per quei clienti finché il dato non viene integrato. Da decidere: richiedere il telefono obbligatorio in fase di ordine sul Portal, o accettare fallimenti puntuali da correggere a mano.
 
 ## Sprint 3 — Etichette con lotto reale ed endpoint operativo (avvio Fase 2)
 
@@ -93,11 +95,12 @@ Da fare quando si passa al deploy reale (fuori scope finché non ci sono ambient
 
 | Punto aperto | Impatto | Sprint interessato |
 |---|---|---|
-| Credenziali MyDHL API + account number non disponibili | Adapter DHL rimandabile, si parte da BRT | Sprint 2 |
+| ~~Credenziali MyDHL API + account number non disponibili~~ — arrivate, app in produzione dal 31/08/2026 | Risolto | Sprint 2 |
 | ~~Tara e dimensioni reali dello scatolone da pesare~~ — pesata 27/08/2026: 250 g | Risolto | Sprint 1 |
 | Pesature dei colli marcati `derivato` | Alcuni pesi restano "da verificare" in etichetta | Sprint 1, Sprint 5 |
 | SKU definitivi scatole regalo/Natale | Cartonizzazione di quei prodotti resta incompleta | Sprint 1 |
 | ~~Conferma stato ordine "in prenotazione"~~ — confermato: `status = 'submitted'` E `crm_opportunity_id IS NOT NULL` (deve esistere l'Opportunity in CRM, non basta il submit sul Portal — 18 ordini storici erano `submitted`/`crm_export_status='exported'` ma senza Opportunity) | Risolto | Sprint 1 |
 | Team produzione+packaging+spedizione condiviso (3 persone) | Il coordinamento implicito oggi va reso esplicito nel sistema — impatta UX di Sprint 4 | Sprint 4 |
-| App developer.dhl.com in stato "pending" — nessuna produzione, ne sandbox funzionanti | `/spedizioni/valida` non chiamabile (401 sia in produzione che sandbox) | Sprint 2 |
+| ~~App developer.dhl.com in stato "pending"~~ — sbloccata da Alessandro Menna, poi promossa a produzione il 31/08/2026 | Risolto | Sprint 2 |
 | Caso limite `fetch_ultimo_lotto`: produzione multipla dello stesso SKU nello stesso giorno per ordini diversi | Rischio di stampare il lotto di un altro ordine se non è davvero sempre "ultimo carico = questo ordine" — da verificare con chi segue EasyFatt | Sprint 3 |
+| Molti clienti senza telefono in anagrafica (`viscotta.customers.phone`) | `POST /spedizioni/{id}/conferma` fallisce (stato `fallita`) per quei clienti — DHL richiede il telefono obbligatoriamente su `/shipments` | Sprint 2 |
