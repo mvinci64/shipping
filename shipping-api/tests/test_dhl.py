@@ -47,3 +47,39 @@ def test_package_solo_peso_senza_dimensioni_censite(monkeypatch):
     monkeypatch.setattr(dhl, "SCATOLONE_DIM_CM", {"lunghezza": None, "larghezza": None, "altezza": None})
     package = dhl._package(3.2)
     assert package == {"weight": 3.2}
+
+
+def _kwargs_crea_spedizione(**override):
+    kwargs = dict(
+        order_number="TEST-001",
+        product_code="N",
+        destinatario_nome="Cliente Prova",
+        destinatario_email="prova@example.com",
+        destinatario_telefono="0000000000",
+        destinatario_indirizzo="Via Prova 1",
+        destinatario_cap="18035",
+        destinatario_citta="Dolceacqua",
+        destinatario_provincia="IM",
+        destinatario_paese="IT",
+        pesi_scatoloni_kg=[3.2],
+        data_spedizione_iso="2026-09-02",
+    )
+    kwargs.update(override)
+    return kwargs
+
+
+def test_crea_spedizione_senza_credenziali_solleva_config_error(monkeypatch):
+    monkeypatch.delenv("DHL_ACCOUNT_NUMBER", raising=False)
+    monkeypatch.delenv("DHL_API_USERNAME", raising=False)
+    monkeypatch.delenv("DHL_API_PASSWORD", raising=False)
+    with pytest.raises(dhl.DHLConfigError):
+        dhl.crea_spedizione(**_kwargs_crea_spedizione())
+
+
+def test_crea_spedizione_senza_contatto_mittente_solleva_config_error(monkeypatch):
+    monkeypatch.setenv("DHL_ACCOUNT_NUMBER", "127990547")
+    monkeypatch.setenv("DHL_API_USERNAME", "user")
+    monkeypatch.setenv("DHL_API_PASSWORD", "pass")
+    monkeypatch.setattr(dhl, "ORIGIN_COMPANY_NAME", "")
+    with pytest.raises(dhl.DHLConfigError):
+        dhl.crea_spedizione(**_kwargs_crea_spedizione())

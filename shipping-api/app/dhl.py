@@ -28,6 +28,13 @@ ORIGIN_POSTAL_CODE = os.environ.get("DHL_ORIGIN_POSTAL_CODE", "")
 ORIGIN_CITY = os.environ.get("DHL_ORIGIN_CITY", "")
 ORIGIN_ADDRESS_LINE = os.environ.get("DHL_ORIGIN_ADDRESS_LINE", "")
 
+# Dati di contatto mittente — richiesti solo da POST /shipments (createShipment),
+# non da /rates. Presi dallo screenshot del portale MyDHL+ (27/08/2026).
+ORIGIN_COMPANY_NAME = os.environ.get("DHL_ORIGIN_COMPANY_NAME", "")
+ORIGIN_CONTACT_NAME = os.environ.get("DHL_ORIGIN_CONTACT_NAME", "")
+ORIGIN_EMAIL = os.environ.get("DHL_ORIGIN_EMAIL", "")
+ORIGIN_PHONE = os.environ.get("DHL_ORIGIN_PHONE", "")
+
 # Dimensioni scatolone in cm — se non censite, il pacco viene quotato a solo
 # peso (meno preciso: DHL applica comunque il peso volumetrico se lo scarto
 # rispetto al peso reale è troppo alto, ma senza dimensioni non lo sappiamo
@@ -123,6 +130,107 @@ def valida_spedizione(
         json=payload,
         auth=(username, password),
         timeout=20,
+    )
+    if response.status_code >= 400:
+        raise DHLAPIError(response.status_code, _safe_json(response))
+    return response.json()
+
+
+def crea_spedizione(
+    *,
+    order_number: str,
+    product_code: str,
+    destinatario_nome: str,
+    destinatario_email: str,
+    destinatario_telefono: str,
+    destinatario_indirizzo: str,
+    destinatario_cap: str,
+    destinatario_citta: str,
+    destinatario_provincia: str,
+    destinatario_paese: str,
+    pesi_scatoloni_kg: list[float],
+    data_spedizione_iso: str,
+) -> dict:
+    """Chiama POST /shipments — crea la spedizione reale ed emette
+    l'etichetta (base64 in risposta). A differenza di valida_spedizione
+    (/rates), QUESTA CHIAMATA HA EFFETTO: in produzione genera una
+    spedizione DHL vera con relativo costo. Va sempre preceduta da una
+    valida_spedizione per scegliere product_code, e va agganciata alla FSM
+    bozza→confermata (non esposta come endpoint diretto finché la FSM non
+    esiste — vedi piano-sprint.md Sprint 2).
+    """
+    account, username, password = _credentials()
+    if not (ORIGIN_POSTAL_CODE and ORIGIN_CITY and ORIGIN_ADDRESS_LINE):
+        raise DHLConfigError(
+            "Indirizzo di origine (magazzino VISCOTTA) non configurato: "
+            "DHL_ORIGIN_POSTAL_CODE / DHL_ORIGIN_CITY / DHL_ORIGIN_ADDRESS_LINE"
+        )
+    if not (ORIGIN_COMPANY_NAME and ORIGIN_CONTACT_NAME and ORIGIN_EMAIL and ORIGIN_PHONE):
+        raise DHLConfigError(
+            "Dati di contatto mittente non configurati: "
+            "DHL_ORIGIN_COMPANY_NAME / DHL_ORIGIN_CONTACT_NAME / DHL_ORIGIN_EMAIL / DHL_ORIGIN_PHONE"
+        )
+
+    payload = {
+        "plannedShippingDateAndTime": f"{data_spedizione_iso}T09:00:00GMT+02:00",
+        "pickup": {"isRequested": False},
+        "productCode": product_code,
+        "accounts": [{"typeCode": "shipper", "number": account}],
+        "outputImageProperties": {
+            "printerDPI": 300,
+            "encodingFormat": "pdf",
+            "imageOptions": [{"typeCode": "label", "templateName": "ECOM26_84_001"}],
+        },
+        "customerDetails": {
+            "shipperDetails": {
+                "postalAddress": {
+                    "postalCode": ORIGIN_POSTAL_CODE,
+                    "cityName": ORIGIN_CITY,
+                    "countryCode": ORIGIN_COUNTRY_CODE,
+                    "addressLine1": ORIGIN_ADDRESS_LINE,
+                },
+                "contactInformation": {
+                    "companyName": ORIGIN_COMPANY_NAME,
+                    "fullName": ORIGIN_CONTACT_NAME,
+                    "email": ORIGIN_EMAIL,
+                    "phone": ORIGIN_PHONE,
+                },
+            },
+            "receiverDetails": {
+                "postalAddress": {
+                    "postalCode": destinatario_cap,
+                    "cityName": destinatario_citta,
+                    "provinceCode": destinatario_provincia,
+                    "countryCode": destinatario_paese,
+                    "addressLine1": destinatario_indirizzo,
+                },
+                "contactInformation": {
+                    "companyName": destinatario_nome,
+                    "fullName": destinatario_nome,
+                    "email": destinatario_email,
+                    "phone": destinatario_telefono,
+                },
+            },
+        },
+        "content": {
+            "packages": [
+                {**_package(peso), "customerReferences": [{"value": order_number, "typeCode": "CU"}]}
+                for peso in pesi_scatoloni_kg
+            ],
+            "isCustomsDeclarable": destinatario_paese != ORIGIN_COUNTRY_CODE,
+            "declaredValue": 1,
+            "declaredValueCurrency": "EUR",
+            "description": "Prodotti da forno artigianali",
+            "incoterm": "DAP",
+            "unitOfMeasurement": "metric",
+        },
+    }
+
+    response = requests.post(
+        f"{BASE_URL}/shipments",
+        json=payload,
+        auth=(username, password),
+        timeout=30,
     )
     if response.status_code >= 400:
         raise DHLAPIError(response.status_code, _safe_json(response))

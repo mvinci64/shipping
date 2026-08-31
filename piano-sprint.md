@@ -29,7 +29,7 @@ Obiettivo: introdurre lo stato "bozza spedizione" nel dominio Shipping e il prim
 - Adapter BRT (ha un flusso draft nativo: `createShipment` provvisoria → `confirmShipment`/`deleteShipment`) — partire da qui perché non dipende dalle credenziali DHL, oggi non disponibili
 - Interfaccia comune "corriere" dietro cui BRT e (in seguito) DHL sono intercambiabili
 - Endpoint `POST /spedizioni` (crea bozza da una cartonizzazione), `POST /spedizioni/{id}/conferma`, `DELETE /spedizioni/{id}`
-- Adapter DHL MyDHL — scope confermato con Alessandro Menna (referente DHL) il 31/08/2026: non solo quotazione, anche **createShipment reale con etichetta** e **prenotazione pickup**, entrambe passate come bozza da confermare (coerente con la FSM sopra). `POST /rates` (quotazione) già implementato e testato in ambiente `exp-mydhlapi-sandbox-all-m`; `POST /shipments` (spedizione+etichetta) e pickup ancora da scrivere
+- Adapter DHL MyDHL — scope confermato con Alessandro Menna (referente DHL) il 31/08/2026: non solo quotazione, anche **createShipment reale con etichetta** e **prenotazione pickup**, entrambe passate come bozza da confermare (coerente con la FSM sopra). `POST /rates` (quotazione) e `POST /shipments` (spedizione+etichetta, funzione `dhl.crea_spedizione`) già implementati e testati con successo in ambiente `exp-mydhlapi-sandbox-all-m` — `crea_spedizione` non è ancora esposta come endpoint (ha effetto reale, va agganciata alla FSM prima di essere richiamabile). Ancora da scrivere: pickup
 
 Dipendenze: account `127990547` abilitato in produzione su MyDHL API (richiesta inviata ad Alessandro Menna il 31/08/2026, in attesa) — ambiente test già attivo e funzionante nel frattempo.
 
