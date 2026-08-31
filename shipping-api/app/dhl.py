@@ -237,6 +237,74 @@ def crea_spedizione(
     return response.json()
 
 
+def richiedi_pickup(
+    *,
+    shipment_tracking_number: str,
+    product_code: str,
+    pesi_scatoloni_kg: list[float],
+    data_pickup_iso: str,
+    ora_inizio: str = "13:00",
+    ora_fine: str = "17:00",
+) -> dict:
+    """Chiama POST /pickups — prenota il ritiro per una spedizione già
+    creata (shipment_tracking_number da crea_spedizione). HA EFFETTO REALE
+    come crea_spedizione: stessa cautela, non esposta come endpoint finché
+    non c'è la FSM bozza→confermata."""
+    account, username, password = _credentials()
+    if not (ORIGIN_POSTAL_CODE and ORIGIN_CITY and ORIGIN_ADDRESS_LINE):
+        raise DHLConfigError(
+            "Indirizzo di origine (magazzino VISCOTTA) non configurato: "
+            "DHL_ORIGIN_POSTAL_CODE / DHL_ORIGIN_CITY / DHL_ORIGIN_ADDRESS_LINE"
+        )
+    if not (ORIGIN_COMPANY_NAME and ORIGIN_CONTACT_NAME and ORIGIN_EMAIL and ORIGIN_PHONE):
+        raise DHLConfigError(
+            "Dati di contatto mittente non configurati: "
+            "DHL_ORIGIN_COMPANY_NAME / DHL_ORIGIN_CONTACT_NAME / DHL_ORIGIN_EMAIL / DHL_ORIGIN_PHONE"
+        )
+
+    payload = {
+        "plannedPickupDateAndTime": f"{data_pickup_iso}T{ora_inizio}:00GMT+02:00",
+        "closeTime": ora_fine,
+        "location": "reception",
+        "locationType": "business",
+        "accounts": [{"typeCode": "shipper", "number": account}],
+        "shipmentDetails": [
+            {
+                "shipmentTrackingNumber": shipment_tracking_number,
+                "productCode": product_code,
+                "unitOfMeasurement": "metric",
+                "packages": [_package(peso) for peso in pesi_scatoloni_kg],
+            }
+        ],
+        "customerDetails": {
+            "shipperDetails": {
+                "postalAddress": {
+                    "postalCode": ORIGIN_POSTAL_CODE,
+                    "cityName": ORIGIN_CITY,
+                    "countryCode": ORIGIN_COUNTRY_CODE,
+                    "addressLine1": ORIGIN_ADDRESS_LINE,
+                },
+                "contactInformation": {
+                    "companyName": ORIGIN_COMPANY_NAME,
+                    "fullName": ORIGIN_CONTACT_NAME,
+                    "email": ORIGIN_EMAIL,
+                    "phone": ORIGIN_PHONE,
+                },
+            },
+        },
+    }
+
+    response = requests.post(
+        f"{BASE_URL}/pickups",
+        json=payload,
+        auth=(username, password),
+        timeout=30,
+    )
+    if response.status_code >= 400:
+        raise DHLAPIError(response.status_code, _safe_json(response))
+    return response.json()
+
+
 def _safe_json(response: requests.Response):
     try:
         return response.json()

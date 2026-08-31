@@ -22,7 +22,7 @@ uvicorn app.main:app --reload
 - `GET /cartonizzazioni/piano-giorno/{data_consegna}` — piano cartonizzazione del giorno: un PDF A4 con 4 ordini per pagina (2×2, linee di taglio), da stampare e allegare fisicamente a ogni ordine in laboratorio (documento ufficiale pre-produzione, distinto dalle etichette collo che arrivano a produzione fatta)
 - `POST /spedizioni/valida/{order_number}` — quota la spedizione via MyDHL API (POST `/rates`) per un ordine reale: nessuna spedizione creata, nessuna etichetta emessa, è la "bozza" emulata (MyDHL API non ha un draft nativo). Richiede le variabili `DHL_*` in `.env`
 
-`app/dhl.py` ha anche `crea_spedizione()` (POST `/shipments` — crea la spedizione reale ed emette l'etichetta, testata con successo in ambiente `exp-mydhlapi-sandbox-all-m`): **non è esposta come endpoint**, ha effetto reale (in produzione genera una spedizione DHL vera con relativo costo) e va agganciata alla FSM bozza→confermata prima di essere richiamabile dall'esterno.
+`app/dhl.py` ha anche `crea_spedizione()` (POST `/shipments` — crea la spedizione reale ed emette l'etichetta) e `richiedi_pickup()` (POST `/pickups` — prenota il ritiro per una spedizione già creata), entrambe testate con successo in ambiente `exp-mydhlapi-sandbox-all-m`: **non sono esposte come endpoint**, hanno effetto reale (in produzione creano spedizione e ritiro DHL veri, con relativo costo) e vanno agganciate alla FSM bozza→confermata prima di essere richiamabili dall'esterno.
 
 ## Test
 

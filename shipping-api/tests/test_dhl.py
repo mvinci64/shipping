@@ -83,3 +83,31 @@ def test_crea_spedizione_senza_contatto_mittente_solleva_config_error(monkeypatc
     monkeypatch.setattr(dhl, "ORIGIN_COMPANY_NAME", "")
     with pytest.raises(dhl.DHLConfigError):
         dhl.crea_spedizione(**_kwargs_crea_spedizione())
+
+
+def _kwargs_richiedi_pickup(**override):
+    kwargs = dict(
+        shipment_tracking_number="7228978945",
+        product_code="N",
+        pesi_scatoloni_kg=[3.2],
+        data_pickup_iso="2026-09-02",
+    )
+    kwargs.update(override)
+    return kwargs
+
+
+def test_richiedi_pickup_senza_credenziali_solleva_config_error(monkeypatch):
+    monkeypatch.delenv("DHL_ACCOUNT_NUMBER", raising=False)
+    monkeypatch.delenv("DHL_API_USERNAME", raising=False)
+    monkeypatch.delenv("DHL_API_PASSWORD", raising=False)
+    with pytest.raises(dhl.DHLConfigError):
+        dhl.richiedi_pickup(**_kwargs_richiedi_pickup())
+
+
+def test_richiedi_pickup_senza_contatto_mittente_solleva_config_error(monkeypatch):
+    monkeypatch.setenv("DHL_ACCOUNT_NUMBER", "127990547")
+    monkeypatch.setenv("DHL_API_USERNAME", "user")
+    monkeypatch.setenv("DHL_API_PASSWORD", "pass")
+    monkeypatch.setattr(dhl, "ORIGIN_COMPANY_NAME", "")
+    with pytest.raises(dhl.DHLConfigError):
+        dhl.richiedi_pickup(**_kwargs_richiedi_pickup())
