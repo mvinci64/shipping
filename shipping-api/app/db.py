@@ -57,14 +57,17 @@ def fetch_order(order_number: str) -> dict | None:
 
 
 def fetch_destinatario(order_number: str) -> dict | None:
-    """Indirizzo di spedizione del cliente per un ordine reale. None se
+    """Indirizzo + contatto del cliente per un ordine reale. None se
     l'ordine non esiste. shipping_address è testo libero (via + CAP in
     coda, es. "Via Rossi 1, 18035"); city/province/country sono colonne
-    separate — parsing del CAP a carico del chiamante."""
+    separate — parsing del CAP a carico del chiamante. email/telefono
+    servono solo per dhl.crea_spedizione (non per /rates); molti clienti
+    non hanno il telefono valorizzato — vedi note in routers/spedizioni.py."""
     with get_connection() as conn:
         row = conn.execute(
             """
-            SELECT c.shipping_address, c.city, c.province, c.country
+            SELECT c.company_name, c.shipping_address, c.city, c.province,
+                   c.country, c.email, c.phone
             FROM viscotta.orders o
             JOIN viscotta.customers c ON c.id = o.customer_id
             WHERE o.order_number = %s
@@ -73,12 +76,15 @@ def fetch_destinatario(order_number: str) -> dict | None:
         ).fetchone()
     if row is None:
         return None
-    indirizzo, citta, provincia, paese = row
+    nome, indirizzo, citta, provincia, paese, email, telefono = row
     return {
+        "nome": nome,
         "indirizzo": indirizzo,
         "citta": citta,
         "provincia": provincia,
         "paese": paese,
+        "email": email,
+        "telefono": telefono,
     }
 
 
@@ -105,6 +111,130 @@ def fetch_ultimo_lotto(sku: str) -> dict | None:
         return None
     lotto, scadenza = row
     return {"lotto": lotto, "scadenza": scadenza.isoformat() if scadenza else None}
+
+
+_COLONNE_SPEDIZIONE = """
+    id, order_number, corriere, stato, product_code, pesi_scatoloni_kg,
+    prezzo_stimato_eur, shipment_tracking_number, tracking_url,
+    dispatch_confirmation_number, errore, creata_at, confermata_at, ritirata_at
+"""
+
+
+def _spedizione_da_riga(row) -> dict:
+    (id_, order_number, corriere, stato, product_code, pesi_scatoloni_kg,
+     prezzo_stimato_eur, shipment_tracking_number, tracking_url,
+     dispatch_confirmation_number, errore, creata_at, confermata_at, ritirata_at) = row
+    return {
+        "id": str(id_),
+        "order_number": order_number,
+        "corriere": corriere,
+        "stato": stato,
+        "product_code": product_code,
+        "pesi_scatoloni_kg": [float(p) for p in pesi_scatoloni_kg],
+        "prezzo_stimato_eur": float(prezzo_stimato_eur) if prezzo_stimato_eur is not None else None,
+        "shipment_tracking_number": shipment_tracking_number,
+        "tracking_url": tracking_url,
+        "dispatch_confirmation_number": dispatch_confirmation_number,
+        "errore": errore,
+        "creata_at": creata_at.isoformat(),
+        "confermata_at": confermata_at.isoformat() if confermata_at else None,
+        "ritirata_at": ritirata_at.isoformat() if ritirata_at else None,
+    }
+
+
+def crea_spedizione_bozza(
+    *, order_number: str, corriere: str, product_code: str,
+    pesi_scatoloni_kg: list[float], prezzo_stimato_eur: float | None,
+) -> dict:
+    """Crea la riga in stato 'bozza' — nessuna chiamata DHL con effetto
+    reale è ancora avvenuta a questo punto (solo /rates, già fatto dal
+    chiamante per ottenere product_code/prezzo)."""
+    with get_connection() as conn:
+        row = conn.execute(
+            f"""
+            INSERT INTO viscotta.spedizioni
+                (order_number, corriere, product_code, pesi_scatoloni_kg, prezzo_stimato_eur)
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING {_COLONNE_SPEDIZIONE}
+            """,
+            (order_number, corriere, product_code, pesi_scatoloni_kg, prezzo_stimato_eur),
+        ).fetchone()
+        conn.commit()
+    return _spedizione_da_riga(row)
+
+
+def fetch_spedizione(spedizione_id: str) -> dict | None:
+    with get_connection() as conn:
+        row = conn.execute(
+            f"SELECT {_COLONNE_SPEDIZIONE} FROM viscotta.spedizioni WHERE id = %s",
+            (spedizione_id,),
+        ).fetchone()
+    return _spedizione_da_riga(row) if row else None
+
+
+def conferma_spedizione(
+    spedizione_id: str, *, shipment_tracking_number: str, tracking_url: str, etichetta_pdf: bytes,
+) -> dict:
+    """bozza -> confermata. Chiamare SOLO dopo che dhl.crea_spedizione ha
+    già avuto successo (ha effetto reale, non è idempotente)."""
+    with get_connection() as conn:
+        row = conn.execute(
+            f"""
+            UPDATE viscotta.spedizioni
+            SET stato = 'confermata', shipment_tracking_number = %s,
+                tracking_url = %s, etichetta_pdf = %s, confermata_at = now()
+            WHERE id = %s AND stato = 'bozza'
+            RETURNING {_COLONNE_SPEDIZIONE}
+            """,
+            (shipment_tracking_number, tracking_url, etichetta_pdf, spedizione_id),
+        ).fetchone()
+        conn.commit()
+    if row is None:
+        raise ValueError(f"Spedizione {spedizione_id} non trovata o non in stato 'bozza'")
+    return _spedizione_da_riga(row)
+
+
+def registra_pickup_spedizione(spedizione_id: str, *, dispatch_confirmation_number: str) -> dict:
+    """confermata -> ritirata. Chiamare SOLO dopo che dhl.richiedi_pickup
+    ha già avuto successo (ha effetto reale, non è idempotente)."""
+    with get_connection() as conn:
+        row = conn.execute(
+            f"""
+            UPDATE viscotta.spedizioni
+            SET stato = 'ritirata', dispatch_confirmation_number = %s, ritirata_at = now()
+            WHERE id = %s AND stato = 'confermata'
+            RETURNING {_COLONNE_SPEDIZIONE}
+            """,
+            (dispatch_confirmation_number, spedizione_id),
+        ).fetchone()
+        conn.commit()
+    if row is None:
+        raise ValueError(f"Spedizione {spedizione_id} non trovata o non in stato 'confermata'")
+    return _spedizione_da_riga(row)
+
+
+def segna_spedizione_fallita(spedizione_id: str, *, errore: str) -> None:
+    """La bozza resta consultabile (stato 'fallita', non cancellata) —
+    l'operatore capisce cos'è andato storto senza dover rifare tutto da
+    capo; nessun retry automatico (Sprint 5)."""
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE viscotta.spedizioni SET stato = 'fallita', errore = %s WHERE id = %s",
+            (errore, spedizione_id),
+        )
+        conn.commit()
+
+
+def elimina_spedizione_bozza(spedizione_id: str) -> bool:
+    """Cancella SOLO se ancora in stato 'bozza' (nessuna chiamata DHL con
+    effetto reale è mai avvenuta per questa riga). True se cancellata."""
+    with get_connection() as conn:
+        cur = conn.execute(
+            "DELETE FROM viscotta.spedizioni WHERE id = %s AND stato = 'bozza'",
+            (spedizione_id,),
+        )
+        conn.commit()
+        return cur.rowcount > 0
 
 
 def fetch_orders_by_delivery_date(data_consegna) -> list[dict]:

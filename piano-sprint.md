@@ -25,13 +25,13 @@ Dipendenze: nessuna esterna. Bloccante per tutti gli sprint successivi.
 
 Obiettivo: introdurre lo stato "bozza spedizione" nel dominio Shipping e il primo adapter corriere funzionante end-to-end in modalità draft.
 
-- Modellare la FSM `bozza → confermata → ritirata` (tabella `spedizioni` o simile, coerente con le convenzioni SQL del progetto). Workflow voluto: il sistema prepara sempre una bozza (spedizione E pickup), l'operatore controlla e conferma da lì — mai invio automatico diretto
-- Adapter BRT (ha un flusso draft nativo: `createShipment` provvisoria → `confirmShipment`/`deleteShipment`) — partire da qui perché non dipende dalle credenziali DHL, oggi non disponibili
-- Interfaccia comune "corriere" dietro cui BRT e (in seguito) DHL sono intercambiabili
-- Endpoint `POST /spedizioni` (crea bozza da una cartonizzazione), `POST /spedizioni/{id}/conferma`, `DELETE /spedizioni/{id}`
-- Adapter DHL MyDHL — scope confermato con Alessandro Menna (referente DHL) il 31/08/2026: non solo quotazione, anche **createShipment reale con etichetta** e **prenotazione pickup**, entrambe passate come bozza da confermare (coerente con la FSM sopra). Tutte e tre implementate e testate con successo in ambiente `exp-mydhlapi-sandbox-all-m`: `POST /rates` (quotazione), `POST /shipments` (spedizione+etichetta, `dhl.crea_spedizione`), `POST /pickups` (ritiro, `dhl.richiedi_pickup`). `crea_spedizione`/`richiedi_pickup` non sono ancora esposte come endpoint (hanno effetto reale, vanno agganciate alla FSM prima di essere richiamabili) — resta da scrivere solo la FSM stessa e gli endpoint `/spedizioni/*`
+- ~~Modellare la FSM `bozza → confermata → ritirata`~~ — fatto: tabella `viscotta.spedizioni` (DDL in `sql/spedizioni_fsm.sql`, **da eseguire manualmente sul DB reale**, non ancora fatto — modifica strutturale su DB condiviso, eseguita a mano per scelta). Workflow implementato: `POST /spedizioni` crea bozza (solo quotazione, nessun effetto reale) → `POST /spedizioni/{id}/conferma` (effetto reale: crea spedizione+etichetta) → `POST /spedizioni/{id}/pickup` (effetto reale: prenota ritiro). Mai invio automatico diretto: ogni transizione con effetto reale richiede una chiamata esplicita
+- Adapter BRT (ha un flusso draft nativo: `createShipment` provvisoria → `confirmShipment`/`deleteShipment`) — non ancora iniziato, resta da fare
+- Interfaccia comune "corriere" dietro cui BRT e (in seguito) DHL sono intercambiabili — non ancora fatto (oggi la FSM parla solo con `app/dhl.py` direttamente)
+- ~~Endpoint `POST /spedizioni` ... `DELETE /spedizioni/{id}`~~ — fatto, più `GET /spedizioni/{id}`, `GET /spedizioni/{id}/etichetta`, `POST /spedizioni/{id}/pickup` (non previsti nel piano originale, aggiunti per lo scope pickup confermato da Alessandro)
+- ~~Adapter DHL MyDHL~~ — fatto: tutte e tre le chiamate (`/rates`, `/shipments`, `/pickups`) implementate, testate con successo in ambiente `exp-mydhlapi-sandbox-all-m` e agganciate alla FSM
 
-Dipendenze: account `127990547` abilitato in produzione su MyDHL API (richiesta inviata ad Alessandro Menna il 31/08/2026, in attesa) — ambiente test già attivo e funzionante nel frattempo.
+Dipendenze: account `127990547` abilitato in produzione su MyDHL API (richiesta inviata ad Alessandro Menna il 31/08/2026, in attesa) — ambiente test già attivo e funzionante nel frattempo. DDL `spedizioni_fsm.sql` da eseguire manualmente prima che gli endpoint `/spedizioni` funzionino.
 
 ## Sprint 3 — Etichette con lotto reale ed endpoint operativo (avvio Fase 2)
 
