@@ -61,15 +61,20 @@ def fetch_destinatario(order_number: str) -> dict | None:
     l'ordine non esiste. shipping_address è testo libero (via + CAP in
     coda, es. "Via Rossi 1, 18035"); city/province/country sono colonne
     separate — parsing del CAP a carico del chiamante. email/telefono
-    servono solo per dhl.crea_spedizione (non per /rates); molti clienti
-    non hanno il telefono valorizzato — vedi note in routers/spedizioni.py."""
+    servono solo per dhl.crea_spedizione (non per /rates); se customers.phone
+    è vuoto si fa fallback su easyfatt.tanagrafica (tel poi cell), agganciata
+    via codanagr = customers.code — chiave pulita, senza duplicati su
+    codanagr. Molti clienti restano comunque senza telefono in nessuna delle
+    due fonti — vedi note in routers/spedizioni.py."""
     with get_connection() as conn:
         row = conn.execute(
             """
             SELECT c.company_name, c.shipping_address, c.city, c.province,
-                   c.country, c.email, c.phone
+                   c.country, c.email,
+                   COALESCE(NULLIF(c.phone, ''), a.tel, a.cell) AS telefono
             FROM viscotta.orders o
             JOIN viscotta.customers c ON c.id = o.customer_id
+            LEFT JOIN easyfatt.tanagrafica a ON a.codanagr = c.code
             WHERE o.order_number = %s
             """,
             (order_number,),

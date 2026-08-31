@@ -33,7 +33,7 @@ Obiettivo: introdurre lo stato "bozza spedizione" nel dominio Shipping e il prim
 
 Dipendenze: nessuna aperta — account `127990547` abilitato in produzione su MyDHL API il 31/08/2026. **Da qui in poi `crea_spedizione`/`richiedi_pickup` hanno sempre effetto reale** (costo reale, ritiro reale) — non richiamarle mai per prova, solo per un ordine vero.
 
-Punto aperto emerso dal test end-to-end: **molti clienti non hanno il telefono in anagrafica** (`viscotta.customers.phone`), campo obbligatorio per DHL su `/shipments` — la conferma di una spedizione fallisce (stato `fallita`, non un bug) per quei clienti finché il dato non viene integrato. Da decidere: richiedere il telefono obbligatorio in fase di ordine sul Portal, o accettare fallimenti puntuali da correggere a mano.
+Punto aperto emerso dal test end-to-end: **molti clienti non hanno il telefono in anagrafica** (`viscotta.customers.phone`), campo obbligatorio per DHL su `/shipments` — la conferma di una spedizione fallisce (stato `fallita`, non un bug) per quei clienti finché il dato non viene integrato. **Mitigato**: `fetch_destinatario` (`shipping-api/app/db.py`) ora fa fallback su `easyfatt.tanagrafica.tel`/`cell`, agganciata via `codanagr = customers.code` (chiave pulita, nessun duplicato) — recupera il telefono per 49 dei 106 clienti attivi che ne erano privi nel Portal. Restano senza telefono in nessuna delle due fonti gli altri ~57: per quelli la conferma continuerà a fallire finché il dato non viene integrato a mano o richiesto obbligatorio sul Portal.
 
 ## Sprint 3 — Etichette con lotto reale ed endpoint operativo (avvio Fase 2)
 
@@ -103,4 +103,4 @@ Da fare quando si passa al deploy reale (fuori scope finché non ci sono ambient
 | Team produzione+packaging+spedizione condiviso (3 persone) | Il coordinamento implicito oggi va reso esplicito nel sistema — impatta UX di Sprint 4 | Sprint 4 |
 | ~~App developer.dhl.com in stato "pending"~~ — sbloccata da Alessandro Menna, poi promossa a produzione il 31/08/2026 | Risolto | Sprint 2 |
 | Caso limite `fetch_ultimo_lotto`: produzione multipla dello stesso SKU nello stesso giorno per ordini diversi | Rischio di stampare il lotto di un altro ordine se non è davvero sempre "ultimo carico = questo ordine" — da verificare con chi segue EasyFatt | Sprint 3 |
-| Molti clienti senza telefono in anagrafica (`viscotta.customers.phone`) | `POST /spedizioni/{id}/conferma` fallisce (stato `fallita`) per quei clienti — DHL richiede il telefono obbligatoriamente su `/shipments` | Sprint 2 |
+| ~~Molti clienti senza telefono in anagrafica (`viscotta.customers.phone`)~~ — mitigato: fallback su `easyfatt.tanagrafica` via `codanagr = customers.code`, recupera 49/106 casi | Restano ~57 clienti senza telefono in nessuna delle due fonti — `conferma` fallisce ancora per quelli | Sprint 2 |
