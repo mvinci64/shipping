@@ -25,7 +25,22 @@
         "startPeriod": 10
       },
       "secrets": [
-        { "name": "DATABASE_URL", "valueFrom": "arn:aws:ssm:<REGION>:<ACCOUNT_ID>:parameter/viscotta/shipping-api/DATABASE_URL" }
+        { "name": "DATABASE_URL", "valueFrom": "arn:aws:ssm:<REGION>:<ACCOUNT_ID>:parameter/viscotta/shipping-api/DATABASE_URL" },
+        { "name": "DHL_ACCOUNT_NUMBER", "valueFrom": "arn:aws:ssm:<REGION>:<ACCOUNT_ID>:parameter/viscotta/shipping-api/DHL_ACCOUNT_NUMBER" },
+        { "name": "DHL_API_USERNAME", "valueFrom": "arn:aws:ssm:<REGION>:<ACCOUNT_ID>:parameter/viscotta/shipping-api/DHL_API_USERNAME" },
+        { "name": "DHL_API_PASSWORD", "valueFrom": "arn:aws:ssm:<REGION>:<ACCOUNT_ID>:parameter/viscotta/shipping-api/DHL_API_PASSWORD" },
+        { "name": "DHL_API_BASE_URL", "valueFrom": "arn:aws:ssm:<REGION>:<ACCOUNT_ID>:parameter/viscotta/shipping-api/DHL_API_BASE_URL" },
+        { "name": "DHL_ORIGIN_COUNTRY_CODE", "valueFrom": "arn:aws:ssm:<REGION>:<ACCOUNT_ID>:parameter/viscotta/shipping-api/DHL_ORIGIN_COUNTRY_CODE" },
+        { "name": "DHL_ORIGIN_POSTAL_CODE", "valueFrom": "arn:aws:ssm:<REGION>:<ACCOUNT_ID>:parameter/viscotta/shipping-api/DHL_ORIGIN_POSTAL_CODE" },
+        { "name": "DHL_ORIGIN_CITY", "valueFrom": "arn:aws:ssm:<REGION>:<ACCOUNT_ID>:parameter/viscotta/shipping-api/DHL_ORIGIN_CITY" },
+        { "name": "DHL_ORIGIN_ADDRESS_LINE", "valueFrom": "arn:aws:ssm:<REGION>:<ACCOUNT_ID>:parameter/viscotta/shipping-api/DHL_ORIGIN_ADDRESS_LINE" },
+        { "name": "DHL_ORIGIN_COMPANY_NAME", "valueFrom": "arn:aws:ssm:<REGION>:<ACCOUNT_ID>:parameter/viscotta/shipping-api/DHL_ORIGIN_COMPANY_NAME" },
+        { "name": "DHL_ORIGIN_CONTACT_NAME", "valueFrom": "arn:aws:ssm:<REGION>:<ACCOUNT_ID>:parameter/viscotta/shipping-api/DHL_ORIGIN_CONTACT_NAME" },
+        { "name": "DHL_ORIGIN_EMAIL", "valueFrom": "arn:aws:ssm:<REGION>:<ACCOUNT_ID>:parameter/viscotta/shipping-api/DHL_ORIGIN_EMAIL" },
+        { "name": "DHL_ORIGIN_PHONE", "valueFrom": "arn:aws:ssm:<REGION>:<ACCOUNT_ID>:parameter/viscotta/shipping-api/DHL_ORIGIN_PHONE" },
+        { "name": "DHL_SCATOLONE_LUNGHEZZA_CM", "valueFrom": "arn:aws:ssm:<REGION>:<ACCOUNT_ID>:parameter/viscotta/shipping-api/DHL_SCATOLONE_LUNGHEZZA_CM" },
+        { "name": "DHL_SCATOLONE_LARGHEZZA_CM", "valueFrom": "arn:aws:ssm:<REGION>:<ACCOUNT_ID>:parameter/viscotta/shipping-api/DHL_SCATOLONE_LARGHEZZA_CM" },
+        { "name": "DHL_SCATOLONE_ALTEZZA_CM", "valueFrom": "arn:aws:ssm:<REGION>:<ACCOUNT_ID>:parameter/viscotta/shipping-api/DHL_SCATOLONE_ALTEZZA_CM" }
       ],
       "logConfiguration": {
         "logDriver": "awslogs",
