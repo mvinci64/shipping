@@ -25,13 +25,13 @@ Dipendenze: nessuna esterna. Bloccante per tutti gli sprint successivi.
 
 Obiettivo: introdurre lo stato "bozza spedizione" nel dominio Shipping e il primo adapter corriere funzionante end-to-end in modalità draft.
 
-- Modellare la FSM `bozza → confermata → ritirata` (tabella `spedizioni` o simile, coerente con le convenzioni SQL del progetto)
+- Modellare la FSM `bozza → confermata → ritirata` (tabella `spedizioni` o simile, coerente con le convenzioni SQL del progetto). Workflow voluto: il sistema prepara sempre una bozza (spedizione E pickup), l'operatore controlla e conferma da lì — mai invio automatico diretto
 - Adapter BRT (ha un flusso draft nativo: `createShipment` provvisoria → `confirmShipment`/`deleteShipment`) — partire da qui perché non dipende dalle credenziali DHL, oggi non disponibili
 - Interfaccia comune "corriere" dietro cui BRT e (in seguito) DHL sono intercambiabili
 - Endpoint `POST /spedizioni` (crea bozza da una cartonizzazione), `POST /spedizioni/{id}/conferma`, `DELETE /spedizioni/{id}`
-- Adapter DHL MyDHL: solo se le credenziali arrivano in tempo, altrimenti si sposta al backlog del prossimo sprint (Basic Auth, flusso emulato: validazione senza etichetta → creazione reale alla conferma)
+- Adapter DHL MyDHL — scope confermato con Alessandro Menna (referente DHL) il 31/08/2026: non solo quotazione, anche **createShipment reale con etichetta** e **prenotazione pickup**, entrambe passate come bozza da confermare (coerente con la FSM sopra). `POST /rates` (quotazione) già implementato e testato in ambiente `exp-mydhlapi-sandbox-all-m`; `POST /shipments` (spedizione+etichetta) e pickup ancora da scrivere
 
-Dipendenze: credenziali MyDHL API + account number (da referente DHL, non ancora disponibili) — rischio di slittamento della parte DHL, non della parte BRT.
+Dipendenze: account `127990547` abilitato in produzione su MyDHL API (richiesta inviata ad Alessandro Menna il 31/08/2026, in attesa) — ambiente test già attivo e funzionante nel frattempo.
 
 ## Sprint 3 — Etichette con lotto reale ed endpoint operativo (avvio Fase 2)
 
