@@ -27,11 +27,19 @@ class SpedizioneResponse(BaseModel):
     confermata_at: str | None
     ritirata_at: str | None
 
-# customers.country nel DB del Portal è testo libero ("Italia"), MyDHL API
-# vuole ISO2. Mappa minima: si estende quando arrivano ordini esteri reali.
-PAESE_ISO2 = {"italia": "IT"}
+# customers.country nel DB del Portal è incoerente: alcuni clienti hanno il
+# nome esteso ("Italia", 109 su 166 attivi), altri già il codice ISO2 ("IT",
+# 58 su 166), altri il nome esteso di un altro paese ("Svezia"). MyDHL API
+# vuole sempre ISO2. Mappa minima per i nomi estesi noti: si estende quando
+# arrivano nuovi paesi reali.
+PAESE_ISO2 = {"italia": "IT", "svezia": "SE"}
 
-CAP_RE = re.compile(r"(\d{5})\s*$")
+# customers.shipping_address ha due formati osservati sul DB reale:
+# "Via Rossi 1, 18035" (CAP in coda) e "NOME VIA STRADA N 20900 CITTÀ (PROV)"
+# (CAP in mezzo, seguito da città/provincia — 12 clienti su 166 attivi,
+# es. "DROGHERIA CIRLA VIA ZUCCHI 14 20900 MONZA (MB)"). Cerca un token di
+# 5 cifre isolato ovunque nella stringa, non solo in coda.
+CAP_RE = re.compile(r"(?<!\d)(\d{5})(?!\d)")
 
 
 def _estrai_cap(indirizzo: str) -> str:
@@ -39,13 +47,16 @@ def _estrai_cap(indirizzo: str) -> str:
     if not match:
         raise HTTPException(
             status_code=422,
-            detail=f"CAP non trovato in coda all'indirizzo: {indirizzo!r}",
+            detail=f"CAP non trovato nell'indirizzo: {indirizzo!r}",
         )
     return match.group(1)
 
 
 def _iso2(paese: str) -> str:
-    codice = PAESE_ISO2.get((paese or "").strip().lower())
+    paese_pulito = (paese or "").strip()
+    if len(paese_pulito) == 2 and paese_pulito.isalpha():
+        return paese_pulito.upper()
+    codice = PAESE_ISO2.get(paese_pulito.lower())
     if codice is None:
         raise HTTPException(
             status_code=422,
