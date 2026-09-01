@@ -40,37 +40,45 @@ def make_inner_labels_pdf(
     from reportlab.graphics.barcode import code128
 
     buf = io.BytesIO()
-    W, H = 60 * mm, 40 * mm
+    # 10x15 cm — formato della stampante etichette non trasparenti di laboratorio.
+    W, H = 100 * mm, 150 * mm
     c = canvas.Canvas(buf, pagesize=(W, H))
+    margine = 8 * mm
     colli = [item for carton in result["scatoloni"] for item in carton["contenuto"]]
     for item in colli:
-        y = H - 6 * mm
-        c.setFont("Helvetica-Bold", 11); c.drawCentredString(W / 2, y, "VISCOTTA")
-        y -= 5 * mm
-        c.setFont("Helvetica-Bold", 9)
-        c.drawString(4 * mm, y, f"{item['sku']}  ({item['formato']})")
-        y -= 4.5 * mm
-        c.setFont("Helvetica", 8)
-        c.drawString(4 * mm, y, f"Quantità: {item['pezzi']} pz")
-        y -= 4.5 * mm
-        c.setFont("Helvetica-Bold", 8)
+        y = H - 16 * mm
+        c.setFont("Helvetica-Bold", 26); c.drawCentredString(W / 2, y, "VISCOTTA")
+        y -= 14 * mm
+        c.setFont("Helvetica-Bold", 20)
+        c.drawString(margine, y, f"{item['sku']}  ({item['formato']})")
+        y -= 11 * mm
+        c.setFont("Helvetica", 14)
+        c.drawString(margine, y, f"Quantità: {item['pezzi']} pz")
+        y -= 12 * mm
+        c.setFont("Helvetica-Bold", 15)
         lotto = (lotti or {}).get(item["sku"])
         if lotto:
-            c.drawString(4 * mm, y, f"Lotto: {lotto['lotto']}  Scad.: {lotto['scadenza']}")
+            c.drawString(margine, y, f"Lotto: {lotto['lotto']}")
+            y -= 8 * mm
+            c.drawString(margine, y, f"Scad.: {lotto['scadenza']}")
         else:
-            c.drawString(4 * mm, y, "Lotto: __________  Scad.: __________")
-        y -= 5 * mm
-        c.setFont("Helvetica", 6)
-        c.drawString(4 * mm, y, f"Ordine {order_number} — {cliente[:24]}")
+            c.drawString(margine, y, "Lotto: __________")
+            y -= 8 * mm
+            c.drawString(margine, y, "Scad.: __________")
+        y -= 10 * mm
+        c.setFont("Helvetica", 9)
+        c.drawString(margine, y, f"Ordine {order_number} — {cliente[:32]}")
 
         gtin = (gtins or {}).get(item["sku"])
         if gtin and lotto and lotto.get("scadenza"):
             payload = _payload_gs1_128(gtin, lotto["lotto"], lotto["scadenza"])
-            bc = code128.Code128(payload, barHeight=6 * mm, barWidth=0.2 * mm)
-            bc.drawOn(c, (W - bc.width) / 2, 2 * mm)
+            bc = code128.Code128(payload, barHeight=22 * mm, barWidth=0.4 * mm)
+            bc.drawOn(c, (W - bc.width) / 2, 15 * mm)
+            c.setFont("Helvetica", 8)
+            c.drawCentredString(W / 2, 10 * mm, f"GTIN {gtin}")
         else:
-            c.setFont("Helvetica", 6)
-            c.drawCentredString(W / 2, 4 * mm, "GTIN non censito — nessun barcode")
+            c.setFont("Helvetica", 11)
+            c.drawCentredString(W / 2, 20 * mm, "GTIN non censito — nessun barcode")
         c.showPage()
     c.save()
     return buf.getvalue()
