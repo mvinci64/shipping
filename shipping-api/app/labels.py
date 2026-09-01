@@ -8,13 +8,33 @@ non da viscotta.ordini_produzione (miniMRP), che non li ha in campo
 strutturato. Senza il dict `lotti` (es. ordini di test via CSV, senza
 riscontro in EasyFatt) resta il placeholder da compilare a mano.
 
+Il barcode è GS1-128 standard: AI(01) GTIN-14, AI(17) scadenza (YYMMDD),
+AI(10) lotto — GTIN da easyfatt.tarticoli.codbarre (vedi db.fetch_gtin),
+non censito per tutti gli articoli. Senza GTIN o lotto non c'è payload GS1
+valido: l'etichetta esce senza barcode, solo testo, da completare a mano.
+
 NON genera l'etichetta scatolone: quella è un riepilogo interno separato,
 e non sostituisce comunque l'etichetta ufficiale del corriere (DHL/BRT).
 """
 import io
 
 
-def make_inner_labels_pdf(order_number: str, cliente: str, result: dict, lotti: dict | None = None) -> bytes:
+def _payload_gs1_128(gtin13: str, lotto: str, scadenza_iso: str) -> str:
+    """AI(01) GTIN-14 + AI(17) scadenza YYMMDD + AI(10) lotto (ultimo AI,
+    lunghezza variabile: non serve separatore FNC1 dopo). \xf1 = FNC1."""
+    gtin14 = gtin13.rjust(14, "0")
+    yy, mm, dd = scadenza_iso.split("-")
+    yymmdd = yy[2:] + mm + dd
+    return f"\xf101{gtin14}17{yymmdd}10{lotto}"
+
+
+def make_inner_labels_pdf(
+    order_number: str,
+    cliente: str,
+    result: dict,
+    lotti: dict | None = None,
+    gtins: dict | None = None,
+) -> bytes:
     from reportlab.lib.units import mm
     from reportlab.pdfgen import canvas
     from reportlab.graphics.barcode import code128
@@ -23,7 +43,7 @@ def make_inner_labels_pdf(order_number: str, cliente: str, result: dict, lotti: 
     W, H = 60 * mm, 40 * mm
     c = canvas.Canvas(buf, pagesize=(W, H))
     colli = [item for carton in result["scatoloni"] for item in carton["contenuto"]]
-    for i, item in enumerate(colli, 1):
+    for item in colli:
         y = H - 6 * mm
         c.setFont("Helvetica-Bold", 11); c.drawCentredString(W / 2, y, "VISCOTTA")
         y -= 5 * mm
@@ -42,8 +62,15 @@ def make_inner_labels_pdf(order_number: str, cliente: str, result: dict, lotti: 
         y -= 5 * mm
         c.setFont("Helvetica", 6)
         c.drawString(4 * mm, y, f"Ordine {order_number} — {cliente[:24]}")
-        bc = code128.Code128(f"{order_number}-{i:02d}", barHeight=6 * mm, barWidth=0.2 * mm)
-        bc.drawOn(c, (W - bc.width) / 2, 2 * mm)
+
+        gtin = (gtins or {}).get(item["sku"])
+        if gtin and lotto and lotto.get("scadenza"):
+            payload = _payload_gs1_128(gtin, lotto["lotto"], lotto["scadenza"])
+            bc = code128.Code128(payload, barHeight=6 * mm, barWidth=0.2 * mm)
+            bc.drawOn(c, (W - bc.width) / 2, 2 * mm)
+        else:
+            c.setFont("Helvetica", 6)
+            c.drawCentredString(W / 2, 4 * mm, "GTIN non censito — nessun barcode")
         c.showPage()
     c.save()
     return buf.getvalue()

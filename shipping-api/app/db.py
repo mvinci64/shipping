@@ -118,6 +118,18 @@ def fetch_ultimo_lotto(sku: str) -> dict | None:
     return {"lotto": lotto, "scadenza": scadenza.isoformat() if scadenza else None}
 
 
+def fetch_gtin(sku: str) -> str | None:
+    """GTIN-13 (EAN-13) dell'articolo, da easyfatt.tarticoli.codbarre — non
+    censito per tutti gli articoli (27 su 202 al 01/09/2026). None se lo SKU
+    non esiste o non ha un codice a barre valorizzato."""
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT codbarre FROM easyfatt.tarticoli WHERE codarticolo = %s AND codbarre IS NOT NULL AND codbarre <> ''",
+            (sku,),
+        ).fetchone()
+    return row[0] if row else None
+
+
 _COLONNE_SPEDIZIONE = """
     id, order_number, corriere, stato, product_code, pesi_scatoloni_kg,
     prezzo_stimato_eur, shipment_tracking_number, tracking_url,

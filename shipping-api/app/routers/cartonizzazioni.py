@@ -95,7 +95,8 @@ def etichette_colli_ordine_reale(order_number: str) -> Response:
     result = cartonize_order(ordine["righe"])
     skus = {item["sku"] for carton in result["scatoloni"] for item in carton["contenuto"]}
     lotti = {sku: lotto for sku in skus if (lotto := db.fetch_ultimo_lotto(sku)) is not None}
-    pdf = make_inner_labels_pdf(order_number, ordine["cliente"], result, lotti)
+    gtins = {sku: gtin for sku in skus if (gtin := db.fetch_gtin(sku)) is not None}
+    pdf = make_inner_labels_pdf(order_number, ordine["cliente"], result, lotti, gtins)
     return Response(
         content=pdf,
         media_type="application/pdf",

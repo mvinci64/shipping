@@ -15,3 +15,18 @@ def test_make_inner_labels_pdf_con_lotto_reale():
     lotti = {"CHMS50": {"lotto": "050826", "scadenza": "2027-08-31"}}
     pdf = make_inner_labels_pdf("TEST-001", "Cliente Prova", result, lotti)
     assert pdf.startswith(b"%PDF-")
+
+
+def test_make_inner_labels_pdf_con_gtin_genera_barcode_gs1():
+    result = cartonize_order([{"sku": "CHMS50", "qta": 30}])
+    lotti = {"CHMS50": {"lotto": "050826", "scadenza": "2027-08-31"}}
+    gtins = {"CHMS50": "8055829950168"}
+    pdf = make_inner_labels_pdf("TEST-001", "Cliente Prova", result, lotti, gtins)
+    assert pdf.startswith(b"%PDF-")
+
+
+def test_make_inner_labels_pdf_senza_gtin_nessun_barcode():
+    result = cartonize_order([{"sku": "CHMS50", "qta": 30}])
+    lotti = {"CHMS50": {"lotto": "050826", "scadenza": "2027-08-31"}}
+    pdf = make_inner_labels_pdf("TEST-001", "Cliente Prova", result, lotti, gtins=None)
+    assert pdf.startswith(b"%PDF-")
