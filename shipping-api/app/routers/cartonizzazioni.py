@@ -87,16 +87,27 @@ def cartonizzazione_ordine_reale(order_number: str) -> RisultatoCartonizzazione:
 
 
 @router.get("/cartonizzazioni/{order_number}/etichette-colli")
-def etichette_colli_ordine_reale(order_number: str) -> Response:
+def etichette_colli_ordine_reale(order_number: str, con_lotto: bool = True) -> Response:
     """Etichette collo (WP50/WP40) per un ordine reale, letto dal DB.
     Lotto/scadenza reali da easyfatt.tmovmagazz (ultimo carico per SKU);
-    se uno SKU non ha mai avuto un carico in EasyFatt resta il placeholder."""
+    se uno SKU non ha mai avuto un carico in EasyFatt resta il placeholder.
+
+    con_lotto=false: stampa in anticipo, quando solo alcuni SKU dell'ordine
+    sono già stati prodotti (es. un ordine con più prodotti, di cui oggi è
+    uscito dal laboratorio solo il primo) — lotto/scadenza verrebbero
+    disallineati per il resto dell'ordine, quindi vengono omessi per tutta
+    l'etichetta. Il barcode resta comunque (GTIN da solo, senza lotto):
+    identifica il prodotto anche quando lotto/scadenza non sono ancora
+    affidabili."""
     ordine = _ordine_reale(order_number)
     result = cartonize_order(ordine["righe"])
     skus = {item["sku"] for carton in result["scatoloni"] for item in carton["contenuto"]}
-    lotti = {sku: lotto for sku in skus if (lotto := db.fetch_ultimo_lotto(sku)) is not None}
+    nomi = {sku: nome for sku in skus if (nome := db.fetch_nome_prodotto(sku)) is not None}
     gtins = {sku: gtin for sku in skus if (gtin := db.fetch_gtin(sku)) is not None}
-    pdf = make_inner_labels_pdf(order_number, ordine["cliente"], result, lotti, gtins)
+    lotti = {}
+    if con_lotto:
+        lotti = {sku: lotto for sku in skus if (lotto := db.fetch_ultimo_lotto(sku)) is not None}
+    pdf = make_inner_labels_pdf(order_number, ordine["cliente"], result, lotti, gtins, nomi, mostra_lotto=con_lotto)
     return Response(
         content=pdf,
         media_type="application/pdf",

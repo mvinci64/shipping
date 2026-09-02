@@ -130,6 +130,19 @@ def fetch_gtin(sku: str) -> str | None:
     return row[0] if row else None
 
 
+def fetch_nome_prodotto(sku: str) -> str | None:
+    """Nome leggibile del prodotto (viscotta.products.name), da mostrare
+    accanto allo SKU sull'etichetta collo — a fine linea, di fretta, deve
+    essere chiaro cosa contiene il collo senza dover ricordare a memoria
+    ogni SKU. None se lo SKU non esiste in anagrafica prodotti."""
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT name FROM viscotta.products WHERE sku = %s",
+            (sku,),
+        ).fetchone()
+    return row[0] if row else None
+
+
 _COLONNE_SPEDIZIONE = """
     id, order_number, corriere, stato, product_code, pesi_scatoloni_kg,
     prezzo_stimato_eur, shipment_tracking_number, tracking_url,
