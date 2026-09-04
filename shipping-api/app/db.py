@@ -375,6 +375,60 @@ def fetch_orders_da_spedire(data_da, data_a) -> list[dict]:
     return risultato
 
 
+def fetch_elenco_spedizioni(data_da, data_a) -> list[dict]:
+    """Come fetch_orders_da_spedire, ma con colli confermati e spedizione
+    più recente già inclusi — tutto su una sola connessione. GET
+    /spedizioni/elenco usava fetch_orders_da_spedire + una fetch_colli_
+    confermati e una fetch_ultima_spedizione_per_ordine PER ORDINE: ogni
+    chiamata apriva una nuova connessione all'RDS (nessun pooling), quindi
+    con N ordini nella finestra la pagina apriva fino a 1+2N connessioni —
+    osservato in pratica (04/09/2026) come pagina lenta/in timeout con una
+    finestra di 2 settimane. cartonize_order(righe) resta a carico del
+    chiamante (logica pura, non serve il DB)."""
+    with get_connection() as conn:
+        ordini = conn.execute(
+            """
+            SELECT o.id, o.order_number, c.company_name, o.requested_delivery_date
+            FROM viscotta.orders o
+            JOIN viscotta.customers c ON c.id = o.customer_id
+            WHERE o.status = 'submitted'
+              AND o.crm_opportunity_id IS NOT NULL
+              AND o.requested_delivery_date BETWEEN %s AND %s
+            ORDER BY o.requested_delivery_date, o.order_number
+            """,
+            (data_da, data_a),
+        ).fetchall()
+
+        risultato = []
+        for order_id, order_number, cliente, data_consegna in ordini:
+            righe = conn.execute(
+                "SELECT sku, quantity FROM viscotta.order_items WHERE order_id = %s",
+                (order_id,),
+            ).fetchall()
+            colli = conn.execute(
+                "SELECT indice_collo FROM viscotta.colli_confermati WHERE order_number = %s",
+                (order_number,),
+            ).fetchall()
+            spedizione_row = conn.execute(
+                f"""
+                SELECT {_COLONNE_SPEDIZIONE} FROM viscotta.spedizioni
+                WHERE order_number = %s
+                ORDER BY creata_at DESC
+                LIMIT 1
+                """,
+                (order_number,),
+            ).fetchone()
+            risultato.append({
+                "order_number": order_number,
+                "cliente": cliente,
+                "data_consegna": data_consegna.isoformat() if data_consegna else None,
+                "righe": [{"sku": sku, "qta": float(qta)} for sku, qta in righe],
+                "colli_confermati": {indice for (indice,) in colli},
+                "spedizione": _spedizione_da_riga(spedizione_row) if spedizione_row else None,
+            })
+    return risultato
+
+
 def fetch_ultima_spedizione_per_ordine(order_number: str) -> dict | None:
     """Spedizione più recente per un ordine (per order_number possono
     esistere più righe nel tempo: una bozza cancellata e poi ricreata, un

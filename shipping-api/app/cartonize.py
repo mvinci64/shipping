@@ -6,30 +6,59 @@ non censiti vengono segnalati come tali.
 """
 import math
 
-TARA_SCATOLONE_G = 250        # pesato 27/08/2026
+TARA_SCATOLONE_G = 500        # forfait — confermato dall'utente 04/09/2026, sostituisce la pesata 250g del 27/08
+
 POSTI_SCATOLONE = 6
 POSTI = {"WP50": 2, "WP40": 1}
 
+# Tara della scatola interna vuota (censimento 26/08).
+TARA_COLLO_G = {"WP50": 200, "WP40": 150}
+
+# Sovrappeso confezionamento per singolo pezzo di prodotto (nastro/etichetta
+# sulla confezione individuale) — regola confermata dall'utente 04/09/2026.
+SOVRAPPESO_CONFEZIONE_G = 6
+
+# Grammatura netta per pezzo — per gli SKU standard è il numero nel codice
+# (es. CHMS50 -> 50g); per VP08BUST/BOXOV/SCAT20V08, dove il codice non lo
+# esprime, il valore è stato confermato a parte dall'utente 04/09/2026.
+GRAMMATURA_G = {
+    "CHMS50": 50, "GRM100": 100, "CANTS100": 100, "CMEN080": 80, "MCIOC080": 80, "MSAL080": 80,
+    "MPEL150": 150, "MSGU150": 150, "MPEL200": 200, "MSGU200": 200,
+    "TCAP075": 75, "CANT200": 200, "BRUT150": 150,
+    "VP08BUST": 160, "BOXOV": 150, "SCAT20V08": 160,
+}
+
+
+def _peso_collo_g(sku: str, formato: str, pezzi: int) -> int:
+    """peso = grammatura netta * pezzi + sovrappeso confezione * pezzi + tara scatola interna."""
+    return pezzi * (GRAMMATURA_G[sku] + SOVRAPPESO_CONFEZIONE_G) + TARA_COLLO_G[formato]
+
+
+# sku: {formato: pezzi} — quanti pezzi entrano in ogni formato di scatola interna (censimento 26/08).
+PEZZI_PER_COLLO = {
+    "CHMS50":    {"WP50": 24, "WP40": 12},
+    "GRM100":    {"WP50": 24, "WP40": 12},
+    "CANTS100":  {"WP50": 24, "WP40": 12},
+    "CMEN080":   {"WP50": 24, "WP40": 12},
+    "MCIOC080":  {"WP50": 24, "WP40": 12},
+    "MSAL080":   {"WP50": 24, "WP40": 12},
+    "MPEL150":   {"WP50": 24, "WP40": 12},
+    "MSGU150":   {"WP50": 24, "WP40": 12},
+    "MPEL200":   {"WP50": 24, "WP40": 12},
+    "MSGU200":   {"WP50": 24, "WP40": 12},
+    "TCAP075":   {"WP50": 12, "WP40": 6},
+    "CANT200":   {"WP50": 12, "WP40": 6},
+    "BRUT150":   {"WP50": 12, "WP40": 6},
+    "VP08BUST":  {"WP50": 12, "WP40": 6},
+    "BOXOV":     {"WP40": 6},
+    "SCAT20V08": {"WP40": 6},
+}
+
+# sku: {formato: (pezzi, peso_g)} — peso ricalcolato dalla formula sopra,
+# non più un numero pesato/derivato a mano per ogni riga.
 CONFEZIONI = {
-    # sku: {formato: (pezzi, peso_g, fonte)}
-    "CHMS50":    {"WP50": (24, 1400, "derivato"),  "WP40": (12,  750, "derivato")},
-    "GRM100":    {"WP50": (24, 2600, "derivato"),  "WP40": (12, 1350, "derivato")},
-    "CANTS100":  {"WP50": (24, 2600, "derivato"),  "WP40": (12, 1350, "derivato")},
-    "CMEN080":   {"WP50": (24, 2120, "derivato"),  "WP40": (12, 1110, "derivato")},
-    "MCIOC080":  {"WP50": (24, 2120, "derivato"),  "WP40": (12, 1110, "derivato")},
-    "MSAL080":   {"WP50": (24, 2120, "derivato"),  "WP40": (12, 1110, "derivato")},
-    # peso netto (24x150=3.600 g, 12x150=1.800 g) + tara WP50 200 g / WP40 150 g
-    "MPEL150":   {"WP50": (24, 3800, "derivato"),  "WP40": (12, 1950, "derivato")},
-    "MSGU150":   {"WP50": (24, 3800, "derivato"),  "WP40": (12, 1950, "derivato")},
-    # peso netto (24x200=4.800 g, 12x200=2.400 g) + tara WP50 200 g / WP40 150 g
-    "MPEL200":   {"WP50": (24, 5000, "derivato"),  "WP40": (12, 2550, "derivato")},
-    "MSGU200":   {"WP50": (24, 5000, "derivato"),  "WP40": (12, 2550, "derivato")},
-    "TCAP075":   {"WP50": (12, 1100, "derivato"),  "WP40": (6,   600, "derivato")},
-    "CANT200":   {"WP50": (12, 2850, "censimento"),"WP40": (6,  1500, "censimento")},
-    "BRUT150":   {"WP50": (12, 2250, "censimento"),"WP40": (6,  1200, "censimento")},
-    "VP08BUST":  {"WP50": (12, 2250, "censimento"),"WP40": (6,  1200, "censimento")},
-    "BOXOV":     {                                 "WP40": (6,  1450, "censimento")},
-    "SCAT20V08": {                                 "WP40": (6,  1450, "censimento")},
+    sku: {fmt: (pz, _peso_collo_g(sku, fmt, pz)) for fmt, pz in formati.items()}
+    for sku, formati in PEZZI_PER_COLLO.items()
 }
 
 
@@ -41,15 +70,16 @@ def cartonize_line(sku: str, qta: int):
     boxes = []
     resto = qta
     if "WP50" in conf:
-        pezzi50, peso50, _ = conf["WP50"]
+        pezzi50, peso50 = conf["WP50"]
         n50 = resto // pezzi50
         boxes += [("WP50", pezzi50, peso50)] * n50
         resto -= n50 * pezzi50
-    pezzi40, peso40, _ = conf["WP40"]
+    pezzi40, peso40 = conf["WP40"]
+    tara40 = TARA_COLLO_G["WP40"]
     n40 = math.ceil(resto / pezzi40) if resto else 0
     for i in range(n40):
         pezzi_in_box = min(pezzi40, resto)
-        peso = peso40 if pezzi_in_box == pezzi40 else round(150 + (peso40 - 150) * pezzi_in_box / pezzi40)
+        peso = peso40 if pezzi_in_box == pezzi40 else round(tara40 + (peso40 - tara40) * pezzi_in_box / pezzi40)
         boxes.append(("WP40", pezzi_in_box, peso))
         resto -= pezzi_in_box
     return boxes

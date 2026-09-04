@@ -168,11 +168,11 @@ def elenco_spedizioni(
         raise HTTPException(status_code=422, detail="data_a precedente a data_da")
 
     righe = []
-    for ordine in db.fetch_orders_da_spedire(data_da, data_a):
+    for ordine in db.fetch_elenco_spedizioni(data_da, data_a):
         cartonizzazione = cartonize_order(ordine["righe"])
         n_colli = cartonizzazione["n_scatoloni"]
-        confermati = db.fetch_colli_confermati(ordine["order_number"])
-        spedizione = db.fetch_ultima_spedizione_per_ordine(ordine["order_number"])
+        confermati = ordine["colli_confermati"]
+        spedizione = ordine["spedizione"]
         righe.append(RigaElenco(
             order_number=ordine["order_number"],
             cliente=ordine["cliente"],
