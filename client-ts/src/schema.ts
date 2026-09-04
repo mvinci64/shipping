@@ -252,6 +252,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/spedizioni/elenco": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Elenco Spedizioni
+         * @description Vista d'insieme, sola lettura: tutti gli ordini "in prenotazione" nel
+         *     periodo (default: oggi + 13 giorni, due settimane), con lo stato dei
+         *     colli scansionati e della spedizione — se esiste già una bozza/una
+         *     conferma. Nessuna azione qui: solo per farsi un'idea di cosa c'è da
+         *     processare, prima di agire con le chiamate dedicate.
+         */
+        get: operations["elenco_spedizioni_spedizioni_elenco_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/spedizioni/{spedizione_id}": {
         parameters: {
             query?: never;
@@ -389,6 +413,25 @@ export interface components {
             cliente: string;
             /** Righe */
             righe: components["schemas"]["RigaOrdine"][];
+        };
+        /** RigaElenco */
+        RigaElenco: {
+            /** Order Number */
+            order_number: string;
+            /** Cliente */
+            cliente: string;
+            /** Data Consegna */
+            data_consegna: string | null;
+            /** N Colli */
+            n_colli: number;
+            /** Colli Confermati */
+            colli_confermati: number;
+            /** Colli Completo */
+            colli_completo: boolean;
+            /** Spedizione Stato */
+            spedizione_stato: string;
+            /** Spedizione Id */
+            spedizione_id: string | null;
         };
         /** RigaOrdine */
         RigaOrdine: {
@@ -849,6 +892,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SpedizioneResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    elenco_spedizioni_spedizioni_elenco_get: {
+        parameters: {
+            query?: {
+                data_da?: string | null;
+                data_a?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RigaElenco"][];
                 };
             };
             /** @description Validation Error */

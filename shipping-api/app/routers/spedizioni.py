@@ -141,6 +141,51 @@ def crea_bozza_spedizione(order_number: str) -> SpedizioneResponse:
     return SpedizioneResponse(**bozza)
 
 
+class RigaElenco(BaseModel):
+    order_number: str
+    cliente: str
+    data_consegna: str | None
+    n_colli: int
+    colli_confermati: int
+    colli_completo: bool
+    spedizione_stato: str  # 'non_iniziata' | 'bozza' | 'confermata' | 'ritirata' | 'fallita'
+    spedizione_id: str | None
+
+
+@router.get("/spedizioni/elenco", response_model=list[RigaElenco])
+def elenco_spedizioni(
+    data_da: datetime.date | None = None, data_a: datetime.date | None = None,
+) -> list[RigaElenco]:
+    """Vista d'insieme, sola lettura: tutti gli ordini "in prenotazione" nel
+    periodo (default: oggi + 13 giorni, due settimane), con lo stato dei
+    colli scansionati e della spedizione — se esiste già una bozza/una
+    conferma. Nessuna azione qui: solo per farsi un'idea di cosa c'è da
+    processare, prima di agire con le chiamate dedicate."""
+    oggi = datetime.date.today()
+    data_da = data_da or oggi
+    data_a = data_a or (oggi + datetime.timedelta(days=13))
+    if data_a < data_da:
+        raise HTTPException(status_code=422, detail="data_a precedente a data_da")
+
+    righe = []
+    for ordine in db.fetch_orders_da_spedire(data_da, data_a):
+        cartonizzazione = cartonize_order(ordine["righe"])
+        n_colli = cartonizzazione["n_scatoloni"]
+        confermati = db.fetch_colli_confermati(ordine["order_number"])
+        spedizione = db.fetch_ultima_spedizione_per_ordine(ordine["order_number"])
+        righe.append(RigaElenco(
+            order_number=ordine["order_number"],
+            cliente=ordine["cliente"],
+            data_consegna=ordine.get("data_consegna"),
+            n_colli=n_colli,
+            colli_confermati=len(confermati),
+            colli_completo=n_colli > 0 and len(confermati) >= n_colli,
+            spedizione_stato=spedizione["stato"] if spedizione else "non_iniziata",
+            spedizione_id=spedizione["id"] if spedizione else None,
+        ))
+    return righe
+
+
 @router.get("/spedizioni/{spedizione_id}", response_model=SpedizioneResponse)
 def dettaglio_spedizione(spedizione_id: str) -> SpedizioneResponse:
     spedizione = db.fetch_spedizione(spedizione_id)

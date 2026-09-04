@@ -338,3 +338,56 @@ def fetch_orders_by_delivery_date(data_consegna) -> list[dict]:
                 "righe": [{"sku": sku, "qta": float(qta)} for sku, qta in righe],
             })
     return risultato
+
+
+def fetch_orders_da_spedire(data_da, data_a) -> list[dict]:
+    """Come fetch_orders_by_delivery_date, ma su un intervallo di date invece
+    che un giorno singolo — per la vista d'insieme "ordini da spedire" del
+    reparto (GET /spedizioni/elenco), non per la cartonizzazione di un
+    singolo giorno. Stesso filtro "in prenotazione" (status='submitted' +
+    crm_opportunity_id valorizzato). Ordinato per data consegna poi ordine."""
+    with get_connection() as conn:
+        ordini = conn.execute(
+            """
+            SELECT o.id, o.order_number, c.company_name, o.requested_delivery_date
+            FROM viscotta.orders o
+            JOIN viscotta.customers c ON c.id = o.customer_id
+            WHERE o.status = 'submitted'
+              AND o.crm_opportunity_id IS NOT NULL
+              AND o.requested_delivery_date BETWEEN %s AND %s
+            ORDER BY o.requested_delivery_date, o.order_number
+            """,
+            (data_da, data_a),
+        ).fetchall()
+
+        risultato = []
+        for order_id, order_number, cliente, data_consegna in ordini:
+            righe = conn.execute(
+                "SELECT sku, quantity FROM viscotta.order_items WHERE order_id = %s",
+                (order_id,),
+            ).fetchall()
+            risultato.append({
+                "order_number": order_number,
+                "cliente": cliente,
+                "data_consegna": data_consegna.isoformat() if data_consegna else None,
+                "righe": [{"sku": sku, "qta": float(qta)} for sku, qta in righe],
+            })
+    return risultato
+
+
+def fetch_ultima_spedizione_per_ordine(order_number: str) -> dict | None:
+    """Spedizione più recente per un ordine (per order_number possono
+    esistere più righe nel tempo: una bozza cancellata e poi ricreata, un
+    tentativo fallito seguito da uno riuscito). None se non è mai stata
+    creata nessuna bozza — l'ordine è "da iniziare", non è un errore."""
+    with get_connection() as conn:
+        row = conn.execute(
+            f"""
+            SELECT {_COLONNE_SPEDIZIONE} FROM viscotta.spedizioni
+            WHERE order_number = %s
+            ORDER BY creata_at DESC
+            LIMIT 1
+            """,
+            (order_number,),
+        ).fetchone()
+    return _spedizione_da_riga(row) if row else None

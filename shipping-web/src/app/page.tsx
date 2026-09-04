@@ -1,9 +1,6 @@
+import Link from "next/link";
 import { shippingClient } from "@/lib/shipping-client";
 
-// Scaffold Sprint 4: verifica solo che shipping-web parli davvero con
-// shipping-api tramite il client tipizzato. Le viste operative reali
-// (lista ordini da spedire, conferma+stampa) arrivano nei prossimi passi
-// dello sprint — vedi ../piano-sprint.md.
 export default async function Home() {
   const { data, error } = await shippingClient.GET("/health").catch((cause) => ({
     data: undefined,
@@ -37,6 +34,13 @@ export default async function Home() {
             </p>
           )}
         </div>
+
+        <Link
+          href="/spedizioni"
+          className="rounded-lg border border-zinc-200 bg-white p-4 text-sm font-medium text-zinc-900 hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 dark:hover:border-zinc-700"
+        >
+          → Ordini da spedire (sola lettura)
+        </Link>
       </main>
     </div>
   );

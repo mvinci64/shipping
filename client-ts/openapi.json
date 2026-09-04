@@ -455,6 +455,75 @@
         }
       }
     },
+    "/spedizioni/elenco": {
+      "get": {
+        "summary": "Elenco Spedizioni",
+        "description": "Vista d'insieme, sola lettura: tutti gli ordini \"in prenotazione\" nel\nperiodo (default: oggi + 13 giorni, due settimane), con lo stato dei\ncolli scansionati e della spedizione — se esiste già una bozza/una\nconferma. Nessuna azione qui: solo per farsi un'idea di cosa c'è da\nprocessare, prima di agire con le chiamate dedicate.",
+        "operationId": "elenco_spedizioni_spedizioni_elenco_get",
+        "parameters": [
+          {
+            "name": "data_da",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Data Da"
+            }
+          },
+          {
+            "name": "data_a",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Data A"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RigaElenco"
+                  },
+                  "title": "Response Elenco Spedizioni Spedizioni Elenco Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/spedizioni/{spedizione_id}": {
       "get": {
         "summary": "Dettaglio Spedizione",
@@ -737,6 +806,68 @@
           "righe"
         ],
         "title": "RichiestaCartonizzazione"
+      },
+      "RigaElenco": {
+        "properties": {
+          "order_number": {
+            "type": "string",
+            "title": "Order Number"
+          },
+          "cliente": {
+            "type": "string",
+            "title": "Cliente"
+          },
+          "data_consegna": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Consegna"
+          },
+          "n_colli": {
+            "type": "integer",
+            "title": "N Colli"
+          },
+          "colli_confermati": {
+            "type": "integer",
+            "title": "Colli Confermati"
+          },
+          "colli_completo": {
+            "type": "boolean",
+            "title": "Colli Completo"
+          },
+          "spedizione_stato": {
+            "type": "string",
+            "title": "Spedizione Stato"
+          },
+          "spedizione_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spedizione Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "order_number",
+          "cliente",
+          "data_consegna",
+          "n_colli",
+          "colli_confermati",
+          "colli_completo",
+          "spedizione_stato",
+          "spedizione_id"
+        ],
+        "title": "RigaElenco"
       },
       "RigaOrdine": {
         "properties": {
