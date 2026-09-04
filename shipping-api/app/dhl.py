@@ -136,6 +136,19 @@ def valida_spedizione(
     return response.json()
 
 
+CONTRASSEGNO_SERVICE_CODE = "KB"
+
+# Metodo di incasso del contrassegno — specifica DHL (04/09/2026):
+# G: Ass. Circolare intestato al mittente
+# L: Ass. Circolare intestato alla casa mandante
+# Q: Ass. Ban. o Post. intestato al mittente
+# R: Ass. Ban. o Post. intestato alla casa mandante
+# Y: Cash, POS
+# K: Cash, POS o Assegno (Banc./Post./Circolare) intestato mittente
+# J: Cash, POS o Assegno (Banc./Post./Circolare) intestato casa mandante
+CONTRASSEGNO_METODI_VALIDI = {"G", "L", "Q", "R", "Y", "K", "J"}
+
+
 def crea_spedizione(
     *,
     order_number: str,
@@ -150,6 +163,8 @@ def crea_spedizione(
     destinatario_paese: str,
     pesi_scatoloni_kg: list[float],
     data_spedizione_iso: str,
+    contrassegno_eur: float | None = None,
+    contrassegno_metodo: str = "Q",
 ) -> dict:
     """Chiama POST /shipments — crea la spedizione reale ed emette
     l'etichetta (base64 in risposta). A differenza di valida_spedizione
@@ -158,6 +173,12 @@ def crea_spedizione(
     valida_spedizione per scegliere product_code, e va agganciata alla FSM
     bozza→confermata (non esposta come endpoint diretto finché la FSM non
     esiste — vedi piano-sprint.md Sprint 2).
+
+    contrassegno_eur: se valorizzato, aggiunge il servizio contrassegno
+    (special service serviceCode "KB", specifica DHL 04/09/2026) — importo
+    riscosso alla consegna. contrassegno_metodo è una delle lettere in
+    CONTRASSEGNO_METODI_VALIDI; il payload MyDHL vuole la lettera ripetuta
+    3 volte (es. "Q" -> "QQQ", non ancora chiaro perché, così da specifica).
     """
     account, username, password = _credentials()
     if not (ORIGIN_POSTAL_CODE and ORIGIN_CITY and ORIGIN_ADDRESS_LINE):
@@ -169,6 +190,10 @@ def crea_spedizione(
         raise DHLConfigError(
             "Dati di contatto mittente non configurati: "
             "DHL_ORIGIN_COMPANY_NAME / DHL_ORIGIN_CONTACT_NAME / DHL_ORIGIN_EMAIL / DHL_ORIGIN_PHONE"
+        )
+    if contrassegno_eur is not None and contrassegno_metodo not in CONTRASSEGNO_METODI_VALIDI:
+        raise DHLConfigError(
+            f"contrassegno_metodo {contrassegno_metodo!r} non valido — atteso uno tra {sorted(CONTRASSEGNO_METODI_VALIDI)}"
         )
 
     payload = {
@@ -225,6 +250,17 @@ def crea_spedizione(
             "unitOfMeasurement": "metric",
         },
     }
+
+    if contrassegno_eur is not None:
+        # NON dentro "content": MyDHL API lo rifiuta lì (422 "extraneous
+        # key [valueAddedServices] is not permitted", verificato in
+        # produzione il 04/09/2026) — va a livello radice del payload.
+        payload["valueAddedServices"] = [{
+            "serviceCode": CONTRASSEGNO_SERVICE_CODE,
+            "value": contrassegno_eur,
+            "currency": "EUR",
+            "method": contrassegno_metodo * 3,
+        }]
 
     response = requests.post(
         f"{BASE_URL}/shipments",
@@ -303,6 +339,29 @@ def richiedi_pickup(
     if response.status_code >= 400:
         raise DHLAPIError(response.status_code, _safe_json(response))
     return response.json()
+
+
+def cancella_pickup(
+    *,
+    dispatch_confirmation_number: str,
+    requestor_name: str,
+    reason: str,
+) -> None:
+    """Chiama DELETE /pickups/{dispatchConfirmationNumber} — annulla un
+    ritiro già prenotato (dispatch_confirmation_number da richiedi_pickup,
+    es. "PRG260907035858"). Specifica DHL (04/09/2026): stesso endpoint
+    dell'ambiente di test, ma senza il segmento "/test/" (già assente da
+    BASE_URL in produzione). HA EFFETTO REALE come richiedi_pickup: stessa
+    cautela. NON annulla la spedizione stessa (l'AWB) — solo il ritiro."""
+    _, username, password = _credentials()
+    response = requests.delete(
+        f"{BASE_URL}/pickups/{dispatch_confirmation_number}",
+        params={"requestorName": requestor_name, "reason": reason},
+        auth=(username, password),
+        timeout=30,
+    )
+    if response.status_code >= 400:
+        raise DHLAPIError(response.status_code, _safe_json(response))
 
 
 def _safe_json(response: requests.Response):

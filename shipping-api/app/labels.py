@@ -192,7 +192,6 @@ def make_carton_summary_labels_pdf(
     pagina per scatolone, nell'ordine di `result["scatoloni"]`."""
     from reportlab.lib.units import mm
     from reportlab.pdfgen import canvas
-    from reportlab.graphics.barcode import code128
 
     buf = io.BytesIO()
     W, H = 150 * mm, 100 * mm
@@ -239,10 +238,7 @@ def make_carton_summary_labels_pdf(
         c.drawRightString(W - margine, 22 * mm, f"Collo {i}/{n_tot}")
 
         c.setFont("Helvetica", 7)
-        c.drawCentredString(W / 2, 15 * mm, "Riepilogo interno — non sostituisce l'etichetta del corriere")
-
-        bc = code128.Code128(f"{order_number}-{i:02d}", barHeight=9 * mm, barWidth=0.28 * mm)
-        bc.drawOn(c, (W - bc.width) / 2, 3 * mm)
+        c.drawCentredString(W / 2, 10 * mm, "Riepilogo interno — non sostituisce l'etichetta del corriere")
 
         c.showPage()
     c.save()

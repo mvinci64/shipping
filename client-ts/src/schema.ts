@@ -128,12 +128,13 @@ export interface paths {
         put?: never;
         /**
          * Conferma Collo Scansionato
-         * @description Conferma di fine linea: il reparto scansiona il barcode già stampato
-         *     sull'etichetta scatolone (Code128 "<ordine>-NN") — nessuna digitazione
-         *     manuale, nessun nuovo strumento in laboratorio. Idempotente: scansionare
-         *     due volte lo stesso collo per errore non è un errore. 422 se l'indice
-         *     non esiste nella cartonizzazione attuale dell'ordine (es. barcode di un
-         *     ordine sbagliato, o cartonizzazione cambiata dopo la stampa).
+         * @description Conferma di fine linea: il codice "<ordine>-NN" leggibile
+         *     sull'etichetta scatolone, digitato a mano (dalla UI shipping-web o via
+         *     questo endpoint) — non c'è più un barcode da scansionare (tolto il
+         *     04/09/2026, confondeva in reparto). Idempotente: confermare due volte
+         *     lo stesso collo per errore non è un errore. 422 se l'indice non esiste
+         *     nella cartonizzazione attuale dell'ordine (es. codice di un ordine
+         *     sbagliato, o cartonizzazione cambiata dopo la stampa).
          */
         post: operations["conferma_collo_scansionato_cartonizzazioni_colli_conferma_post"];
         delete?: never;

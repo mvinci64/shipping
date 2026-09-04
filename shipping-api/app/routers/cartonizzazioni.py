@@ -79,9 +79,11 @@ def _ordine_reale(order_number: str) -> dict:
     return ordine
 
 
-# Formato del codice scansionato: "<order_number>-NN", stesso testo
-# codificato nel barcode Code128 dell'etichetta scatolone (vedi
+# Formato del codice di conferma: "<order_number>-NN", lo stesso testo
+# "Collo NN/totale" leggibile sull'etichetta scatolone (vedi
 # labels.make_carton_summary_labels_pdf) — NN a 2 cifre, indice 1-based.
+# L'etichetta scatolone non ha più un barcode (tolto il 04/09/2026): la
+# conferma è digitata a mano o fatta dalla UI shipping-web, non scansionata.
 CODICE_COLLO_RE = re.compile(r"^(?P<order_number>.+)-(?P<indice>\d{2})$")
 
 
@@ -175,12 +177,13 @@ def etichette_scatolone_ordine_reale(order_number: str) -> Response:
 
 @router.post("/cartonizzazioni/colli/conferma", response_model=StatoColli)
 def conferma_collo_scansionato(scansione: ScansioneCollo) -> StatoColli:
-    """Conferma di fine linea: il reparto scansiona il barcode già stampato
-    sull'etichetta scatolone (Code128 "<ordine>-NN") — nessuna digitazione
-    manuale, nessun nuovo strumento in laboratorio. Idempotente: scansionare
-    due volte lo stesso collo per errore non è un errore. 422 se l'indice
-    non esiste nella cartonizzazione attuale dell'ordine (es. barcode di un
-    ordine sbagliato, o cartonizzazione cambiata dopo la stampa)."""
+    """Conferma di fine linea: il codice "<ordine>-NN" leggibile
+    sull'etichetta scatolone, digitato a mano (dalla UI shipping-web o via
+    questo endpoint) — non c'è più un barcode da scansionare (tolto il
+    04/09/2026, confondeva in reparto). Idempotente: confermare due volte
+    lo stesso collo per errore non è un errore. 422 se l'indice non esiste
+    nella cartonizzazione attuale dell'ordine (es. codice di un ordine
+    sbagliato, o cartonizzazione cambiata dopo la stampa)."""
     order_number, indice = _parse_codice_collo(scansione.codice)
     stato = _stato_colli(order_number)
     if indice > stato.n_totale:

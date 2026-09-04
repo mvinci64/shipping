@@ -30,13 +30,13 @@ uvicorn app.main:app --reload
 
 ### Conferma collo a fine linea
 
-Il reparto scansiona il barcode già stampato sull'etichetta scatolone (`<order_number>-NN`) per confermare che quel collo è stato fisicamente chiuso — nessuna digitazione manuale, nessun nuovo strumento:
+Il reparto conferma da `shipping-web` (`/spedizioni/{order_number}`), o digitando a mano il codice `<order_number>-NN` letto sull'etichetta scatolone (nessun barcode: tolto il 04/09/2026, confondeva in reparto — la conferma non è pensata per la scansione):
 
-- `POST /cartonizzazioni/colli/conferma` — body `{"codice": "<order_number>-NN"}`, idempotente (doppia scansione non è un errore)
+- `POST /cartonizzazioni/colli/conferma` — body `{"codice": "<order_number>-NN"}`, idempotente (confermare due volte non è un errore)
 - `GET /cartonizzazioni/{order_number}/colli` — stato: `n_totale`/`confermati`/`mancanti`/`completo`
-- `DELETE /cartonizzazioni/{order_number}/colli/{indice_collo}` — annulla una conferma (errore di scansione)
+- `DELETE /cartonizzazioni/{order_number}/colli/{indice_collo}` — annulla una conferma (errore)
 
-`POST /spedizioni/{id}/conferma` rifiuta con **409** se `completo` non è `true` per l'ordine: non si può confermare una spedizione reale (costo e ritiro reali) con colli non ancora scansionati.
+`POST /spedizioni/{id}/conferma` rifiuta con **409** se `completo` non è `true` per l'ordine: non si può confermare una spedizione reale (costo e ritiro reali) con colli non ancora confermati.
 
 Richiede la tabella `viscotta.colli_confermati` — vedi `psql -f ../sql/colli_confermati.sql`.
 

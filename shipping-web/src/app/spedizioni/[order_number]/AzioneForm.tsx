@@ -14,7 +14,7 @@ type Props = {
   children?: React.ReactNode;
   /** Se presente, il form resta bloccato indipendentemente dal testo
    * digitato — con il motivo mostrato all'operatore (es. colli non ancora
-   * scansionati). Il backend applica comunque lo stesso vincolo (409): è
+   * confermati). Il backend applica comunque lo stesso vincolo (409): è
    * un aiuto per non far provare a vuoto, non l'unico controllo. */
   bloccatoPer?: string;
 };

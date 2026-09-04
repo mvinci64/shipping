@@ -35,7 +35,7 @@ export default async function DettaglioSpedizione({
   const stato = spedizione.data?.stato ?? "non_iniziata";
   const collliCompleti = colli.data?.completo ?? false;
   const motivoBloccoConferma = !collliCompleti
-    ? `Mancano colli da scansionare (${colli.data?.confermati.length ?? 0}/${colli.data?.n_totale ?? 0}) — vedi POST /cartonizzazioni/colli/conferma`
+    ? `Mancano colli da confermare (${colli.data?.confermati.length ?? 0}/${colli.data?.n_totale ?? 0}) — vedi POST /cartonizzazioni/colli/conferma`
     : undefined;
 
   return (
@@ -81,7 +81,7 @@ export default async function DettaglioSpedizione({
         </section>
 
         <section className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
-          <h2 className="text-sm font-medium text-zinc-900 dark:text-zinc-100">Colli scansionati a fine linea</h2>
+          <h2 className="text-sm font-medium text-zinc-900 dark:text-zinc-100">Colli confermati a fine linea</h2>
           <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">
             {colli.data?.confermati.length ?? 0}/{colli.data?.n_totale ?? 0}
             {collliCompleti ? " — completo ✓" : ""}

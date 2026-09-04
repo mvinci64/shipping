@@ -209,7 +209,7 @@
     "/cartonizzazioni/colli/conferma": {
       "post": {
         "summary": "Conferma Collo Scansionato",
-        "description": "Conferma di fine linea: il reparto scansiona il barcode già stampato\nsull'etichetta scatolone (Code128 \"<ordine>-NN\") — nessuna digitazione\nmanuale, nessun nuovo strumento in laboratorio. Idempotente: scansionare\ndue volte lo stesso collo per errore non è un errore. 422 se l'indice\nnon esiste nella cartonizzazione attuale dell'ordine (es. barcode di un\nordine sbagliato, o cartonizzazione cambiata dopo la stampa).",
+        "description": "Conferma di fine linea: il codice \"<ordine>-NN\" leggibile\nsull'etichetta scatolone, digitato a mano (dalla UI shipping-web o via\nquesto endpoint) — non c'è più un barcode da scansionare (tolto il\n04/09/2026, confondeva in reparto). Idempotente: confermare due volte\nlo stesso collo per errore non è un errore. 422 se l'indice non esiste\nnella cartonizzazione attuale dell'ordine (es. codice di un ordine\nsbagliato, o cartonizzazione cambiata dopo la stampa).",
         "operationId": "conferma_collo_scansionato_cartonizzazioni_colli_conferma_post",
         "requestBody": {
           "content": {

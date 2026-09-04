@@ -28,7 +28,7 @@ export async function creaBozzaAction(
 }
 
 // EFFETTO REALE: crea la spedizione DHL vera con relativo costo. Il gate
-// sui colli scansionati è lato shipping-api (409 se mancano) — qui si
+// sui colli confermati è lato shipping-api (409 se mancano) — qui si
 // propaga solo l'errore.
 export async function confermaSpedizioneAction(
   spedizioneId: string, orderNumber: string, _prev: StatoAzione, _formData: FormData,
