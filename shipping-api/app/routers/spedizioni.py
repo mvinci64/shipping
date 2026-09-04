@@ -186,6 +186,16 @@ def elenco_spedizioni(
     return righe
 
 
+@router.get("/spedizioni/per-ordine/{order_number}", response_model=SpedizioneResponse | None)
+def spedizione_per_ordine(order_number: str) -> SpedizioneResponse | None:
+    """Spedizione più recente per un ordine, o null se non è mai stata
+    creata una bozza — non è un errore, è lo stato "da iniziare". Usato
+    dalla pagina di dettaglio ordine, che non ha altrimenti modo di
+    risalire allo spedizione_id partendo dal solo order_number."""
+    spedizione = db.fetch_ultima_spedizione_per_ordine(order_number)
+    return SpedizioneResponse(**spedizione) if spedizione else None
+
+
 @router.get("/spedizioni/{spedizione_id}", response_model=SpedizioneResponse)
 def dettaglio_spedizione(spedizione_id: str) -> SpedizioneResponse:
     spedizione = db.fetch_spedizione(spedizione_id)

@@ -524,6 +524,54 @@
         }
       }
     },
+    "/spedizioni/per-ordine/{order_number}": {
+      "get": {
+        "summary": "Spedizione Per Ordine",
+        "description": "Spedizione più recente per un ordine, o null se non è mai stata\ncreata una bozza — non è un errore, è lo stato \"da iniziare\". Usato\ndalla pagina di dettaglio ordine, che non ha altrimenti modo di\nrisalire allo spedizione_id partendo dal solo order_number.",
+        "operationId": "spedizione_per_ordine_spedizioni_per_ordine__order_number__get",
+        "parameters": [
+          {
+            "name": "order_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Order Number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/SpedizioneResponse"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Spedizione Per Ordine Spedizioni Per Ordine  Order Number  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/spedizioni/{spedizione_id}": {
       "get": {
         "summary": "Dettaglio Spedizione",

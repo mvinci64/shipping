@@ -276,6 +276,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/spedizioni/per-ordine/{order_number}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Spedizione Per Ordine
+         * @description Spedizione più recente per un ordine, o null se non è mai stata
+         *     creata una bozza — non è un errore, è lo stato "da iniziare". Usato
+         *     dalla pagina di dettaglio ordine, che non ha altrimenti modo di
+         *     risalire allo spedizione_id partendo dal solo order_number.
+         */
+        get: operations["spedizione_per_ordine_spedizioni_per_ordine__order_number__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/spedizioni/{spedizione_id}": {
         parameters: {
             query?: never;
@@ -924,6 +947,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RigaElenco"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    spedizione_per_ordine_spedizioni_per_ordine__order_number__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_number: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpedizioneResponse"] | null;
                 };
             };
             /** @description Validation Error */

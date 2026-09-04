@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { shippingClient } from "@/lib/shipping-client";
 
 export const metadata = { title: "Spedizioni — VISCOTTA" };
@@ -45,7 +46,8 @@ export default async function Spedizioni({
             Ordini da spedire
           </h1>
           <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-            Vista sola lettura — prossime due settimane, salvo filtro esplicito. Nessuna azione da qui.
+            Prossime due settimane, salvo filtro esplicito. Nessuna azione da questa vista — clicca un ordine per il
+            dettaglio.
           </p>
         </div>
 
@@ -74,23 +76,36 @@ export default async function Spedizioni({
               <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
                 {righe.map((riga) => {
                   const badge = ETICHETTA_STATO[riga.spedizione_stato] ?? ETICHETTA_STATO.non_iniziata;
+                  const href = `/spedizioni/${riga.order_number}?cliente=${encodeURIComponent(riga.cliente)}`;
                   return (
-                    <tr key={riga.order_number} className="bg-white dark:bg-zinc-950">
+                    <tr key={riga.order_number} className="bg-white hover:bg-zinc-50 dark:bg-zinc-950 dark:hover:bg-zinc-900">
                       <td className="whitespace-nowrap px-4 py-2 text-zinc-700 dark:text-zinc-300">
-                        {formattaData(riga.data_consegna)}
+                        <Link href={href} className="block">
+                          {formattaData(riga.data_consegna)}
+                        </Link>
                       </td>
                       <td className="whitespace-nowrap px-4 py-2 font-mono text-xs text-zinc-900 dark:text-zinc-100">
-                        {riga.order_number}
+                        <Link href={href} className="block">
+                          {riga.order_number}
+                        </Link>
                       </td>
-                      <td className="px-4 py-2 text-zinc-900 dark:text-zinc-100">{riga.cliente}</td>
+                      <td className="px-4 py-2 text-zinc-900 dark:text-zinc-100">
+                        <Link href={href} className="block">
+                          {riga.cliente}
+                        </Link>
+                      </td>
                       <td className="whitespace-nowrap px-4 py-2 text-zinc-700 dark:text-zinc-300">
-                        {riga.colli_confermati}/{riga.n_colli}
-                        {riga.colli_completo && riga.n_colli > 0 ? " ✓" : ""}
+                        <Link href={href} className="block">
+                          {riga.colli_confermati}/{riga.n_colli}
+                          {riga.colli_completo && riga.n_colli > 0 ? " ✓" : ""}
+                        </Link>
                       </td>
                       <td className="whitespace-nowrap px-4 py-2">
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${badge.classi}`}>
-                          {badge.testo}
-                        </span>
+                        <Link href={href} className="block">
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${badge.classi}`}>
+                            {badge.testo}
+                          </span>
+                        </Link>
                       </td>
                     </tr>
                   );
