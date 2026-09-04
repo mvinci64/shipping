@@ -1,0 +1,1086 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "VISCOTTA Shipping API",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/cartonizzazioni": {
+      "post": {
+        "summary": "Crea Cartonizzazione",
+        "operationId": "crea_cartonizzazione_cartonizzazioni_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RichiestaCartonizzazione"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RisultatoCartonizzazione"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cartonizzazioni/etichette-colli": {
+      "post": {
+        "summary": "Etichette Colli",
+        "description": "Etichette per ogni collo interno (WP50/WP40), lotto/quantità —\nquella che conta ai fini di tracciabilità. Distinta dall'etichetta\nscatolone (riepilogo) e dall'etichetta ufficiale del corriere.",
+        "operationId": "etichette_colli_cartonizzazioni_etichette_colli_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RichiestaCartonizzazione"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cartonizzazioni/{order_number}": {
+      "get": {
+        "summary": "Cartonizzazione Ordine Reale",
+        "description": "Cartonizzazione di un ordine reale, letto da viscotta.orders/order_items.",
+        "operationId": "cartonizzazione_ordine_reale_cartonizzazioni__order_number__get",
+        "parameters": [
+          {
+            "name": "order_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Order Number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RisultatoCartonizzazione"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cartonizzazioni/{order_number}/etichette-colli": {
+      "get": {
+        "summary": "Etichette Colli Ordine Reale",
+        "description": "Etichette collo (WP50/WP40) per un ordine reale, letto dal DB.\nLotto/scadenza reali da easyfatt.tmovmagazz (ultimo carico per SKU);\nse uno SKU non ha mai avuto un carico in EasyFatt resta il placeholder.\n\ncon_lotto=false: stampa in anticipo, quando solo alcuni SKU dell'ordine\nsono già stati prodotti (es. un ordine con più prodotti, di cui oggi è\nuscito dal laboratorio solo il primo) — lotto/scadenza verrebbero\ndisallineati per il resto dell'ordine, quindi vengono omessi per tutta\nl'etichetta. Il barcode resta comunque (GTIN da solo, senza lotto):\nidentifica il prodotto anche quando lotto/scadenza non sono ancora\naffidabili.",
+        "operationId": "etichette_colli_ordine_reale_cartonizzazioni__order_number__etichette_colli_get",
+        "parameters": [
+          {
+            "name": "order_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Order Number"
+            }
+          },
+          {
+            "name": "con_lotto",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Con Lotto"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cartonizzazioni/{order_number}/etichette-scatolone": {
+      "get": {
+        "summary": "Etichette Scatolone Ordine Reale",
+        "description": "Etichetta scatolone (una per collo di spedizione): riepilogo interno\ndi cosa contiene, con dati reali dell'ordine (cliente, data consegna).\nDistinta dalle etichette collo WP50/WP40 e dall'etichetta ufficiale del\ncorriere (DHL/BRT), che resta da applicare a parte alla conferma\nspedizione.",
+        "operationId": "etichette_scatolone_ordine_reale_cartonizzazioni__order_number__etichette_scatolone_get",
+        "parameters": [
+          {
+            "name": "order_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Order Number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cartonizzazioni/colli/conferma": {
+      "post": {
+        "summary": "Conferma Collo Scansionato",
+        "description": "Conferma di fine linea: il reparto scansiona il barcode già stampato\nsull'etichetta scatolone (Code128 \"<ordine>-NN\") — nessuna digitazione\nmanuale, nessun nuovo strumento in laboratorio. Idempotente: scansionare\ndue volte lo stesso collo per errore non è un errore. 422 se l'indice\nnon esiste nella cartonizzazione attuale dell'ordine (es. barcode di un\nordine sbagliato, o cartonizzazione cambiata dopo la stampa).",
+        "operationId": "conferma_collo_scansionato_cartonizzazioni_colli_conferma_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScansioneCollo"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatoColli"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cartonizzazioni/{order_number}/colli": {
+      "get": {
+        "summary": "Stato Colli Ordine",
+        "description": "Stato delle conferme di fine linea per un ordine: quanti colli sono\nstati scansionati, quali mancano. Usare prima di confermare la\nspedizione (POST /spedizioni/{id}/conferma ha effetto reale).",
+        "operationId": "stato_colli_ordine_cartonizzazioni__order_number__colli_get",
+        "parameters": [
+          {
+            "name": "order_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Order Number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatoColli"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cartonizzazioni/{order_number}/colli/{indice_collo}": {
+      "delete": {
+        "summary": "Annulla Conferma Collo",
+        "description": "Annulla la conferma di un collo (errore di scansione).",
+        "operationId": "annulla_conferma_collo_cartonizzazioni__order_number__colli__indice_collo__delete",
+        "parameters": [
+          {
+            "name": "order_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Order Number"
+            }
+          },
+          {
+            "name": "indice_collo",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Indice Collo"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatoColli"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cartonizzazioni/piano-giorno/{data_consegna}": {
+      "get": {
+        "summary": "Piano Giorno",
+        "description": "Piano di cartonizzazione del giorno: un PDF A4, 4 ordini per pagina\n(2×2, linee di taglio), da stampare e allegare fisicamente a ogni ordine\nin laboratorio — documento ufficiale pre-produzione. Un ordine per\nritaglio: le etichette collo WP50/WP40 (lotto/scadenza reali) arrivano\ndopo, a produzione fatta.",
+        "operationId": "piano_giorno_cartonizzazioni_piano_giorno__data_consegna__get",
+        "parameters": [
+          {
+            "name": "data_consegna",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Data Consegna"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/spedizioni/valida/{order_number}": {
+      "post": {
+        "summary": "Valida Spedizione",
+        "description": "Quota la spedizione di un ordine reale via MyDHL API (POST /rates) —\nnessuna spedizione viene creata, nessuna etichetta emessa: è la\n\"bozza\" emulata. Combina cartonizzazione (pesi scatoloni) e indirizzo\ncliente da DB.",
+        "operationId": "valida_spedizione_spedizioni_valida__order_number__post",
+        "parameters": [
+          {
+            "name": "order_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Order Number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Valida Spedizione Spedizioni Valida  Order Number  Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/spedizioni": {
+      "post": {
+        "summary": "Crea Bozza Spedizione",
+        "description": "Crea la bozza (stato 'bozza'): quota via /rates e salva su DB.\nNessuna chiamata DHL con effetto reale — solo /rates, come /valida.",
+        "operationId": "crea_bozza_spedizione_spedizioni_post",
+        "parameters": [
+          {
+            "name": "order_number",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Order Number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpedizioneResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/spedizioni/{spedizione_id}": {
+      "get": {
+        "summary": "Dettaglio Spedizione",
+        "operationId": "dettaglio_spedizione_spedizioni__spedizione_id__get",
+        "parameters": [
+          {
+            "name": "spedizione_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Spedizione Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpedizioneResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Elimina Bozza Spedizione",
+        "description": "Cancella SOLO se ancora in stato 'bozza' — nessuna chiamata DHL con\neffetto reale è mai avvenuta per una bozza, quindi non c'è nulla da\nannullare lato DHL.",
+        "operationId": "elimina_bozza_spedizione_spedizioni__spedizione_id__delete",
+        "parameters": [
+          {
+            "name": "spedizione_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Spedizione Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/spedizioni/{spedizione_id}/conferma": {
+      "post": {
+        "summary": "Conferma Spedizione",
+        "description": "bozza -> confermata. QUESTA CHIAMATA HA EFFETTO REALE: crea la\nspedizione DHL vera con relativo costo (dhl.crea_spedizione). Va\ninvocata solo dopo controllo umano della bozza (GET /spedizioni/{id}).\n\nGate: rifiuta (409) se il reparto non ha ancora scansionato tutti i\ncolli dell'ordine (vedi POST /cartonizzazioni/colli/conferma) — senza\nquesto controllo si potrebbe confermare (costo reale, ritiro reale)\nuna spedizione con uno scatolone ancora aperto sul tavolo.",
+        "operationId": "conferma_spedizione_spedizioni__spedizione_id__conferma_post",
+        "parameters": [
+          {
+            "name": "spedizione_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Spedizione Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpedizioneResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/spedizioni/{spedizione_id}/etichetta": {
+      "get": {
+        "summary": "Etichetta Spedizione",
+        "description": "PDF etichetta ufficiale DHL — solo per spedizioni 'confermata'/'ritirata'.",
+        "operationId": "etichetta_spedizione_spedizioni__spedizione_id__etichetta_get",
+        "parameters": [
+          {
+            "name": "spedizione_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Spedizione Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/spedizioni/{spedizione_id}/pickup": {
+      "post": {
+        "summary": "Richiedi Pickup Spedizione",
+        "description": "confermata -> ritirata. QUESTA CHIAMATA HA EFFETTO REALE: prenota\nil ritiro DHL vero (dhl.richiedi_pickup). data_pickup di default\ndomani (i ritiri lo stesso giorno spesso non sono più prenotabili\ndopo il cutoff — vedi pickupCapabilities in /rates).",
+        "operationId": "richiedi_pickup_spedizione_spedizioni__spedizione_id__pickup_post",
+        "parameters": [
+          {
+            "name": "spedizione_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Spedizione Id"
+            }
+          },
+          {
+            "name": "data_pickup",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Data Pickup"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpedizioneResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Health",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "RichiestaCartonizzazione": {
+        "properties": {
+          "order_number": {
+            "type": "string",
+            "title": "Order Number"
+          },
+          "cliente": {
+            "type": "string",
+            "title": "Cliente",
+            "default": ""
+          },
+          "righe": {
+            "items": {
+              "$ref": "#/components/schemas/RigaOrdine"
+            },
+            "type": "array",
+            "title": "Righe"
+          }
+        },
+        "type": "object",
+        "required": [
+          "order_number",
+          "righe"
+        ],
+        "title": "RichiestaCartonizzazione"
+      },
+      "RigaOrdine": {
+        "properties": {
+          "sku": {
+            "type": "string",
+            "title": "Sku"
+          },
+          "qta": {
+            "type": "number",
+            "title": "Qta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sku",
+          "qta"
+        ],
+        "title": "RigaOrdine"
+      },
+      "RisultatoCartonizzazione": {
+        "properties": {
+          "order_number": {
+            "type": "string",
+            "title": "Order Number"
+          },
+          "scatoloni": {
+            "items": {
+              "$ref": "#/components/schemas/Scatolone"
+            },
+            "type": "array",
+            "title": "Scatoloni"
+          },
+          "n_scatoloni": {
+            "type": "integer",
+            "title": "N Scatoloni"
+          },
+          "posti_liberi_ultimo": {
+            "type": "integer",
+            "title": "Posti Liberi Ultimo"
+          },
+          "peso_totale_kg": {
+            "type": "number",
+            "title": "Peso Totale Kg"
+          },
+          "non_censiti": {
+            "items": {
+              "$ref": "#/components/schemas/SkuNonCensito"
+            },
+            "type": "array",
+            "title": "Non Censiti"
+          }
+        },
+        "type": "object",
+        "required": [
+          "order_number",
+          "scatoloni",
+          "n_scatoloni",
+          "posti_liberi_ultimo",
+          "peso_totale_kg",
+          "non_censiti"
+        ],
+        "title": "RisultatoCartonizzazione"
+      },
+      "ScansioneCollo": {
+        "properties": {
+          "codice": {
+            "type": "string",
+            "title": "Codice"
+          }
+        },
+        "type": "object",
+        "required": [
+          "codice"
+        ],
+        "title": "ScansioneCollo"
+      },
+      "ScatolaInterna": {
+        "properties": {
+          "formato": {
+            "type": "string",
+            "title": "Formato"
+          },
+          "sku": {
+            "type": "string",
+            "title": "Sku"
+          },
+          "pezzi": {
+            "type": "integer",
+            "title": "Pezzi"
+          },
+          "peso_g": {
+            "type": "integer",
+            "title": "Peso G"
+          }
+        },
+        "type": "object",
+        "required": [
+          "formato",
+          "sku",
+          "pezzi",
+          "peso_g"
+        ],
+        "title": "ScatolaInterna"
+      },
+      "Scatolone": {
+        "properties": {
+          "posti_usati": {
+            "type": "integer",
+            "title": "Posti Usati"
+          },
+          "contenuto": {
+            "items": {
+              "$ref": "#/components/schemas/ScatolaInterna"
+            },
+            "type": "array",
+            "title": "Contenuto"
+          },
+          "peso_g": {
+            "type": "integer",
+            "title": "Peso G"
+          }
+        },
+        "type": "object",
+        "required": [
+          "posti_usati",
+          "contenuto",
+          "peso_g"
+        ],
+        "title": "Scatolone"
+      },
+      "SkuNonCensito": {
+        "properties": {
+          "sku": {
+            "type": "string",
+            "title": "Sku"
+          },
+          "qta": {
+            "type": "number",
+            "title": "Qta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sku",
+          "qta"
+        ],
+        "title": "SkuNonCensito"
+      },
+      "SpedizioneResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "order_number": {
+            "type": "string",
+            "title": "Order Number"
+          },
+          "corriere": {
+            "type": "string",
+            "title": "Corriere"
+          },
+          "stato": {
+            "type": "string",
+            "title": "Stato"
+          },
+          "product_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Product Code"
+          },
+          "pesi_scatoloni_kg": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Pesi Scatoloni Kg"
+          },
+          "prezzo_stimato_eur": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prezzo Stimato Eur"
+          },
+          "shipment_tracking_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shipment Tracking Number"
+          },
+          "tracking_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tracking Url"
+          },
+          "dispatch_confirmation_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dispatch Confirmation Number"
+          },
+          "errore": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Errore"
+          },
+          "creata_at": {
+            "type": "string",
+            "title": "Creata At"
+          },
+          "confermata_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confermata At"
+          },
+          "ritirata_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ritirata At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "order_number",
+          "corriere",
+          "stato",
+          "product_code",
+          "pesi_scatoloni_kg",
+          "prezzo_stimato_eur",
+          "shipment_tracking_number",
+          "tracking_url",
+          "dispatch_confirmation_number",
+          "errore",
+          "creata_at",
+          "confermata_at",
+          "ritirata_at"
+        ],
+        "title": "SpedizioneResponse"
+      },
+      "StatoColli": {
+        "properties": {
+          "order_number": {
+            "type": "string",
+            "title": "Order Number"
+          },
+          "n_totale": {
+            "type": "integer",
+            "title": "N Totale"
+          },
+          "confermati": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Confermati"
+          },
+          "mancanti": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Mancanti"
+          },
+          "completo": {
+            "type": "boolean",
+            "title": "Completo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "order_number",
+          "n_totale",
+          "confermati",
+          "mancanti",
+          "completo"
+        ],
+        "title": "StatoColli"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

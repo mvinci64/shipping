@@ -1,0 +1,20 @@
+{
+  "name": "@viscotta/shipping-client",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Client TS tipizzato per shipping-api (VISCOTTA), generato dal contratto OpenAPI. Consumato da shipping-web e potenzialmente dall'Order Portal.",
+  "type": "module",
+  "main": "src/client.ts",
+  "types": "src/client.ts",
+  "scripts": {
+    "generate:types": "openapi-typescript openapi.json -o src/schema.ts",
+    "refresh": "cd ../shipping-api && ./venv/bin/python scripts/export_openapi.py && cd ../client-ts && npm run generate:types"
+  },
+  "dependencies": {
+    "openapi-fetch": "^0.13.0"
+  },
+  "devDependencies": {
+    "openapi-typescript": "^7.4.0",
+    "typescript": "^5.6.0"
+  }
+}
