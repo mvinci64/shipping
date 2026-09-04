@@ -1,4 +1,5 @@
 import datetime
+import re
 
 from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel
@@ -6,7 +7,7 @@ from pydantic import BaseModel
 from app import db
 from app.cartonize import cartonize_order
 from app.day_plan import make_day_plan_pdf
-from app.labels import make_inner_labels_pdf
+from app.labels import make_carton_summary_labels_pdf, make_inner_labels_pdf
 
 router = APIRouter()
 
@@ -78,6 +79,46 @@ def _ordine_reale(order_number: str) -> dict:
     return ordine
 
 
+# Formato del codice scansionato: "<order_number>-NN", stesso testo
+# codificato nel barcode Code128 dell'etichetta scatolone (vedi
+# labels.make_carton_summary_labels_pdf) — NN a 2 cifre, indice 1-based.
+CODICE_COLLO_RE = re.compile(r"^(?P<order_number>.+)-(?P<indice>\d{2})$")
+
+
+def _parse_codice_collo(codice: str) -> tuple[str, int]:
+    match = CODICE_COLLO_RE.match(codice.strip())
+    if not match:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Codice collo non riconosciuto: {codice!r} (atteso '<ordine>-NN', es. 'ORD-20260910-1234-01')",
+        )
+    return match.group("order_number"), int(match.group("indice"))
+
+
+class ScansioneCollo(BaseModel):
+    codice: str
+
+
+class StatoColli(BaseModel):
+    order_number: str
+    n_totale: int
+    confermati: list[int]
+    mancanti: list[int]
+    completo: bool
+
+
+def _stato_colli(order_number: str) -> StatoColli:
+    ordine = _ordine_reale(order_number)
+    result = cartonize_order(ordine["righe"])
+    n_totale = result["n_scatoloni"]
+    confermati = sorted(db.fetch_colli_confermati(order_number))
+    mancanti = sorted(set(range(1, n_totale + 1)) - set(confermati))
+    return StatoColli(
+        order_number=order_number, n_totale=n_totale, confermati=confermati,
+        mancanti=mancanti, completo=n_totale > 0 and not mancanti,
+    )
+
+
 @router.get("/cartonizzazioni/{order_number}", response_model=RisultatoCartonizzazione)
 def cartonizzazione_ordine_reale(order_number: str) -> RisultatoCartonizzazione:
     """Cartonizzazione di un ordine reale, letto da viscotta.orders/order_items."""
@@ -113,6 +154,57 @@ def etichette_colli_ordine_reale(order_number: str, con_lotto: bool = True) -> R
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="etichette_colli_{order_number}.pdf"'},
     )
+
+
+@router.get("/cartonizzazioni/{order_number}/etichette-scatolone")
+def etichette_scatolone_ordine_reale(order_number: str) -> Response:
+    """Etichetta scatolone (una per collo di spedizione): riepilogo interno
+    di cosa contiene, con dati reali dell'ordine (cliente, data consegna).
+    Distinta dalle etichette collo WP50/WP40 e dall'etichetta ufficiale del
+    corriere (DHL/BRT), che resta da applicare a parte alla conferma
+    spedizione."""
+    ordine = _ordine_reale(order_number)
+    result = cartonize_order(ordine["righe"])
+    pdf = make_carton_summary_labels_pdf(order_number, ordine["cliente"], ordine.get("data_consegna"), result)
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="etichette_scatolone_{order_number}.pdf"'},
+    )
+
+
+@router.post("/cartonizzazioni/colli/conferma", response_model=StatoColli)
+def conferma_collo_scansionato(scansione: ScansioneCollo) -> StatoColli:
+    """Conferma di fine linea: il reparto scansiona il barcode già stampato
+    sull'etichetta scatolone (Code128 "<ordine>-NN") — nessuna digitazione
+    manuale, nessun nuovo strumento in laboratorio. Idempotente: scansionare
+    due volte lo stesso collo per errore non è un errore. 422 se l'indice
+    non esiste nella cartonizzazione attuale dell'ordine (es. barcode di un
+    ordine sbagliato, o cartonizzazione cambiata dopo la stampa)."""
+    order_number, indice = _parse_codice_collo(scansione.codice)
+    stato = _stato_colli(order_number)
+    if indice > stato.n_totale:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Collo {indice} non esiste per l'ordine {order_number} (cartonizzazione attuale: {stato.n_totale} colli)",
+        )
+    db.conferma_collo(order_number, indice)
+    return _stato_colli(order_number)
+
+
+@router.get("/cartonizzazioni/{order_number}/colli", response_model=StatoColli)
+def stato_colli_ordine(order_number: str) -> StatoColli:
+    """Stato delle conferme di fine linea per un ordine: quanti colli sono
+    stati scansionati, quali mancano. Usare prima di confermare la
+    spedizione (POST /spedizioni/{id}/conferma ha effetto reale)."""
+    return _stato_colli(order_number)
+
+
+@router.delete("/cartonizzazioni/{order_number}/colli/{indice_collo}", response_model=StatoColli)
+def annulla_conferma_collo(order_number: str, indice_collo: int) -> StatoColli:
+    """Annulla la conferma di un collo (errore di scansione)."""
+    db.annulla_conferma_collo(order_number, indice_collo)
+    return _stato_colli(order_number)
 
 
 @router.get("/cartonizzazioni/piano-giorno/{data_consegna}")

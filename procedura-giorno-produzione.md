@@ -20,11 +20,15 @@ Conseguenza diretta: **nessuna etichetta con lotto reale può essere generata pr
 | 4 | `easyfatt.tmovmagazz` sull'RDS condiviso riflette il carico | RDS condiviso | — (automatico, conseguenza del 3) | — |
 | 5 | Cartonizzazione: `POST /cartonizzazioni` calcola scatoloni/pesi | shipping-api | Reparto packaging | No |
 | 6 | Etichette collo interno con lotto/scadenza reali: `GET /cartonizzazioni/{order_number}/etichette-colli` | shipping-api → `easyfatt.tmovmagazz` | Reparto packaging | No, ma **richiede che il passo 3 sia già avvenuto quel giorno** |
-| 7 | Bozza spedizione: `POST /spedizioni` (quotazione DHL, nessun effetto reale) | shipping-api → DHL `/rates` | Reparto spedizione | No |
-| 8 | Conferma spedizione: `POST /spedizioni/{id}/conferma` | shipping-api → DHL `/shipments` | Reparto spedizione | **Sì — irreversibile, costo reale** |
-| 9 | Richiesta ritiro: `POST /spedizioni/{id}/pickup` | shipping-api → DHL `/pickups` | Reparto spedizione | **Sì — irreversibile, ritiro reale** |
+| 7 | Etichetta scatolone (riepilogo interno, una per collo): `GET /cartonizzazioni/{order_number}/etichette-scatolone` | shipping-api | Reparto packaging | No |
+| 8 | Chiusura fisica di ogni scatolone e scansione del suo barcode a fine linea: `POST /cartonizzazioni/colli/conferma` (body `{"codice": "<ordine>-NN"}`, il testo stampato sul barcode del passo 7 — nessuna digitazione manuale) | shipping-api → `viscotta.colli_confermati` | Reparto packaging | No, ma **è il gate del passo 10**: se un collo non viene scansionato, la conferma spedizione lo rifiuta |
+| 9 | Bozza spedizione: `POST /spedizioni` (quotazione DHL, nessun effetto reale) | shipping-api → DHL `/rates` | Reparto spedizione | No |
+| 10 | Conferma spedizione: `POST /spedizioni/{id}/conferma` | shipping-api → DHL `/shipments` | Reparto spedizione | **Sì — irreversibile, costo reale** |
+| 11 | Richiesta ritiro: `POST /spedizioni/{id}/pickup` | shipping-api → DHL `/pickups` | Reparto spedizione | **Sì — irreversibile, ritiro reale** |
 
-Il passo 8 fallisce (stato `fallita`, non un bug) se il cliente non ha telefono in nessuna fonte — vedi `piano-sprint.md`, mitigato parzialmente con fallback su `easyfatt.tanagrafica`.
+Il passo 10 rifiuta con 409 se il passo 8 non è stato completato per tutti gli scatoloni dell'ordine (vedi `GET /cartonizzazioni/{order_number}/colli` per lo stato: confermati/mancanti) — aggiunto il 04/09/2026 perché senza questo controllo si poteva confermare una spedizione reale (costo reale, ritiro reale) anche con uno scatolone ancora aperto sul tavolo. Il passo 10 fallisce anche (stato `fallita`, non un bug) se il cliente non ha telefono in nessuna fonte — vedi `piano-sprint.md`, mitigato parzialmente con fallback su `easyfatt.tanagrafica`.
+
+Il codice scansionato al passo 8 non contiene lotto/scadenza: conferma solo che quello scatolone è stato fisicamente chiuso. Il passo 8 non ha una dipendenza dal passo 3 (l'ETL) — a differenza del passo 6, può avvenire in qualunque momento dopo la cartonizzazione.
 
 ## Il punto critico da decidere
 

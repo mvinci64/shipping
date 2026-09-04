@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from app import db, dhl
 from app.cartonize import cartonize_order
+from app.routers.cartonizzazioni import _stato_colli
 
 router = APIRouter()
 
@@ -152,12 +153,28 @@ def dettaglio_spedizione(spedizione_id: str) -> SpedizioneResponse:
 def conferma_spedizione(spedizione_id: str) -> SpedizioneResponse:
     """bozza -> confermata. QUESTA CHIAMATA HA EFFETTO REALE: crea la
     spedizione DHL vera con relativo costo (dhl.crea_spedizione). Va
-    invocata solo dopo controllo umano della bozza (GET /spedizioni/{id})."""
+    invocata solo dopo controllo umano della bozza (GET /spedizioni/{id}).
+
+    Gate: rifiuta (409) se il reparto non ha ancora scansionato tutti i
+    colli dell'ordine (vedi POST /cartonizzazioni/colli/conferma) — senza
+    questo controllo si potrebbe confermare (costo reale, ritiro reale)
+    una spedizione con uno scatolone ancora aperto sul tavolo."""
     spedizione = db.fetch_spedizione(spedizione_id)
     if spedizione is None:
         raise HTTPException(status_code=404, detail=f"Spedizione {spedizione_id} non trovata")
     if spedizione["stato"] != "bozza":
         raise HTTPException(status_code=409, detail=f"Spedizione in stato '{spedizione['stato']}', non 'bozza'")
+
+    stato_colli = _stato_colli(spedizione["order_number"])
+    if not stato_colli.completo:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Colli non ancora tutti confermati a fine linea per l'ordine "
+                f"{spedizione['order_number']}: mancano {stato_colli.mancanti} "
+                f"su {stato_colli.n_totale} (vedi GET /cartonizzazioni/{spedizione['order_number']}/colli)"
+            ),
+        )
 
     ordine, destinatario = _ordine_e_destinatario(spedizione["order_number"])
     try:

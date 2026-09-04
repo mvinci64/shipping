@@ -33,7 +33,7 @@ def fetch_order(order_number: str) -> dict | None:
     with get_connection() as conn:
         row = conn.execute(
             """
-            SELECT o.id, c.company_name
+            SELECT o.id, c.company_name, o.requested_delivery_date
             FROM viscotta.orders o
             JOIN viscotta.customers c ON c.id = o.customer_id
             WHERE o.order_number = %s
@@ -42,7 +42,7 @@ def fetch_order(order_number: str) -> dict | None:
         ).fetchone()
         if row is None:
             return None
-        order_id, cliente = row
+        order_id, cliente, data_consegna = row
 
         righe = conn.execute(
             "SELECT sku, quantity FROM viscotta.order_items WHERE order_id = %s",
@@ -52,6 +52,7 @@ def fetch_order(order_number: str) -> dict | None:
     return {
         "order_number": order_number,
         "cliente": cliente,
+        "data_consegna": data_consegna.isoformat() if data_consegna else None,
         "righe": [{"sku": sku, "qta": float(qta)} for sku, qta in righe],
     }
 
@@ -265,6 +266,42 @@ def elimina_spedizione_bozza(spedizione_id: str) -> bool:
         )
         conn.commit()
         return cur.rowcount > 0
+
+
+def conferma_collo(order_number: str, indice_collo: int) -> None:
+    """Registra la scansione di fine linea per un collo (uno scatolone).
+    Idempotente: se il collo era già confermato, non fa nulla (doppia
+    scansione per errore non deve rompere il flusso a reparto)."""
+    with get_connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO viscotta.colli_confermati (order_number, indice_collo)
+            VALUES (%s, %s)
+            ON CONFLICT (order_number, indice_collo) DO NOTHING
+            """,
+            (order_number, indice_collo),
+        )
+        conn.commit()
+
+
+def annulla_conferma_collo(order_number: str, indice_collo: int) -> bool:
+    """Annulla una conferma (errore di scansione). True se c'era da annullare."""
+    with get_connection() as conn:
+        cur = conn.execute(
+            "DELETE FROM viscotta.colli_confermati WHERE order_number = %s AND indice_collo = %s",
+            (order_number, indice_collo),
+        )
+        conn.commit()
+        return cur.rowcount > 0
+
+
+def fetch_colli_confermati(order_number: str) -> set[int]:
+    with get_connection() as conn:
+        righe = conn.execute(
+            "SELECT indice_collo FROM viscotta.colli_confermati WHERE order_number = %s",
+            (order_number,),
+        ).fetchall()
+    return {indice for (indice,) in righe}
 
 
 def fetch_orders_by_delivery_date(data_consegna) -> list[dict]:

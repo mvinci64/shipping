@@ -1,5 +1,5 @@
 from app.cartonize import cartonize_order
-from app.labels import make_inner_labels_pdf
+from app.labels import make_carton_summary_labels_pdf, make_inner_labels_pdf
 
 
 def test_make_inner_labels_pdf_produce_pdf_valido():
@@ -60,4 +60,24 @@ def test_make_inner_labels_pdf_senza_lotto_barcode_solo_gtin():
     result = cartonize_order([{"sku": "CHMS50", "qta": 30}])
     gtins = {"CHMS50": "8055829950168"}
     pdf = make_inner_labels_pdf("TEST-001", "Cliente Prova", result, lotti=None, gtins=gtins, mostra_lotto=False)
+    assert pdf.startswith(b"%PDF-")
+
+
+def test_make_carton_summary_labels_pdf_produce_pdf_valido():
+    result = cartonize_order([{"sku": "CHMS50", "qta": 30}])
+    pdf = make_carton_summary_labels_pdf("TEST-001", "Cliente Prova", "2026-09-10", result)
+    assert pdf.startswith(b"%PDF-")
+
+
+def test_make_carton_summary_labels_pdf_senza_data_consegna():
+    # data_consegna può mancare (ordine di test via CSV, non reale) — non deve rompere la stampa
+    result = cartonize_order([{"sku": "CHMS50", "qta": 30}])
+    pdf = make_carton_summary_labels_pdf("TEST-001", "Cliente Prova", None, result)
+    assert pdf.startswith(b"%PDF-")
+
+
+def test_make_carton_summary_labels_pdf_con_non_censiti():
+    result = cartonize_order([{"sku": "CHMS50", "qta": 24}, {"sku": "SCONOSCIUTO01", "qta": 3}])
+    assert result["non_censiti"]
+    pdf = make_carton_summary_labels_pdf("TEST-001", "Cliente Prova", "2026-09-10", result)
     assert pdf.startswith(b"%PDF-")

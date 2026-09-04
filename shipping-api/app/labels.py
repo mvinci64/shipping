@@ -175,3 +175,75 @@ def make_inner_labels_pdf(
         c.showPage()
     c.save()
     return buf.getvalue()
+
+
+def make_carton_summary_labels_pdf(
+    order_number: str,
+    cliente: str,
+    data_consegna: str | None,
+    result: dict,
+) -> bytes:
+    """Etichetta scatolone — riepilogo interno di cosa contiene il collo di
+    spedizione (quali WP50/WP40, pesi). NON è l'etichetta ufficiale del
+    corriere (quella la emette DHL/BRT sul collo alla creazione della
+    spedizione) e non sostituisce le etichette dei singoli WP50/WP40 già
+    applicate alle scatole interne. Stesso formato/stampante delle etichette
+    collo (15×10 cm orizzontale) per coerenza fisica in laboratorio — una
+    pagina per scatolone, nell'ordine di `result["scatoloni"]`."""
+    from reportlab.lib.units import mm
+    from reportlab.pdfgen import canvas
+    from reportlab.graphics.barcode import code128
+
+    buf = io.BytesIO()
+    W, H = 150 * mm, 100 * mm
+    c = canvas.Canvas(buf, pagesize=(W, H))
+    margine = 8 * mm
+    larghezza_utile = W - 2 * margine
+    n_tot = result["n_scatoloni"]
+
+    for i, carton in enumerate(result["scatoloni"], 1):
+        y = H - 8 * mm
+        c.setFont("Helvetica-Bold", 9)
+        c.drawString(margine, y, "VISCOTTA")
+        c.setFont("Helvetica", 8)
+        etichetta_ordine = f"Ordine {order_number}"
+        if data_consegna:
+            etichetta_ordine += f" — consegna {data_consegna}"
+        c.drawRightString(W - margine, y, etichetta_ordine)
+        y -= 11 * mm
+
+        righe_cliente = _a_capo(c, cliente, "Helvetica-Bold", 20, larghezza_utile, righe_max=2)
+        c.setFont("Helvetica-Bold", 20)
+        for riga in righe_cliente:
+            c.drawString(margine, y, riga)
+            y -= 7.5 * mm
+        y -= 5.5 * mm if len(righe_cliente) == 1 else 0
+
+        c.setFont("Helvetica-Bold", 11)
+        c.drawString(margine, y, "Contenuto:")
+        y -= 6 * mm
+        c.setFont("Helvetica", 9)
+        for item in carton["contenuto"]:
+            c.drawString(margine + 2 * mm, y, f"1× {item['formato']}  {item['sku']}  ({item['pezzi']} pz)")
+            c.drawRightString(W - margine, y, f"{item['peso_g'] / 1000:.2f} kg")
+            y -= 5 * mm
+
+        if i == n_tot and result["non_censiti"]:
+            c.setFont("Helvetica-Oblique", 8)
+            for nc in result["non_censiti"]:
+                c.drawString(margine + 2 * mm, y, f"+ {nc['qta']}× {nc['sku']} (da sistemare a mano)")
+                y -= 4.5 * mm
+
+        c.setFont("Helvetica-Bold", 13)
+        c.drawString(margine, 22 * mm, f"Peso lordo: {carton['peso_g'] / 1000:.2f} kg")
+        c.drawRightString(W - margine, 22 * mm, f"Collo {i}/{n_tot}")
+
+        c.setFont("Helvetica", 7)
+        c.drawCentredString(W / 2, 15 * mm, "Riepilogo interno — non sostituisce l'etichetta del corriere")
+
+        bc = code128.Code128(f"{order_number}-{i:02d}", barHeight=9 * mm, barWidth=0.28 * mm)
+        bc.drawOn(c, (W - bc.width) / 2, 3 * mm)
+
+        c.showPage()
+    c.save()
+    return buf.getvalue()
