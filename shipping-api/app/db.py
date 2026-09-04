@@ -61,17 +61,22 @@ def fetch_destinatario(order_number: str) -> dict | None:
     """Indirizzo + contatto del cliente per un ordine reale. None se
     l'ordine non esiste. shipping_address è testo libero (via + CAP in
     coda, es. "Via Rossi 1, 18035"); city/province/country sono colonne
-    separate — parsing del CAP a carico del chiamante. email/telefono
-    servono solo per dhl.crea_spedizione (non per /rates); se customers.phone
-    è vuoto si fa fallback su easyfatt.tanagrafica (tel poi cell), agganciata
-    via codanagr = customers.code — chiave pulita, senza duplicati su
-    codanagr. Molti clienti restano comunque senza telefono in nessuna delle
-    due fonti — vedi note in routers/spedizioni.py."""
+    separate. cap è la colonna dedicata su viscotta.customers (aggiunta
+    04/09/2026, backfillata da EasyFatt+clienti_geom sul Portal — risolve
+    il CAP per 67 clienti su 71 con ordini in prenotazione, contro i 27
+    di prima che dipendevano dal parsing di shipping_address): se vuota,
+    resta a carico del chiamante estrarla da shipping_address (vedi
+    _estrai_cap in routers/spedizioni.py). email/telefono servono solo per
+    dhl.crea_spedizione (non per /rates); se customers.phone è vuoto si fa
+    fallback su easyfatt.tanagrafica (tel poi cell), agganciata via
+    codanagr = customers.code — chiave pulita, senza duplicati su
+    codanagr. Molti clienti restano comunque senza telefono in nessuna
+    delle due fonti — vedi note in routers/spedizioni.py."""
     with get_connection() as conn:
         row = conn.execute(
             """
             SELECT c.company_name, c.shipping_address, c.city, c.province,
-                   c.country, c.email,
+                   c.country, c.email, c.cap,
                    COALESCE(NULLIF(c.phone, ''), a.tel, a.cell) AS telefono
             FROM viscotta.orders o
             JOIN viscotta.customers c ON c.id = o.customer_id
@@ -82,7 +87,7 @@ def fetch_destinatario(order_number: str) -> dict | None:
         ).fetchone()
     if row is None:
         return None
-    nome, indirizzo, citta, provincia, paese, email, telefono = row
+    nome, indirizzo, citta, provincia, paese, email, cap, telefono = row
     return {
         "nome": nome,
         "indirizzo": indirizzo,
@@ -90,6 +95,7 @@ def fetch_destinatario(order_number: str) -> dict | None:
         "provincia": provincia,
         "paese": paese,
         "email": email,
+        "cap": cap or None,
         "telefono": telefono,
     }
 

@@ -53,6 +53,13 @@ def _estrai_cap(indirizzo: str) -> str:
     return match.group(1)
 
 
+def _cap_destinatario(destinatario: dict) -> str:
+    """customers.cap (colonna dedicata, aggiunta 04/09/2026) se
+    valorizzata; altrimenti fallback sul parsing di shipping_address —
+    resta utile per i pochi clienti non ancora coperti dal backfill."""
+    return destinatario.get("cap") or _estrai_cap(destinatario["indirizzo"])
+
+
 def _iso2(paese: str) -> str:
     paese_pulito = (paese or "").strip()
     if len(paese_pulito) == 2 and paese_pulito.isalpha():
@@ -83,7 +90,7 @@ def _pesi_scatoloni_kg(ordine: dict) -> list[float]:
 def _quota(destinatario: dict, pesi_kg: list[float], data_iso: str) -> dict:
     try:
         return dhl.valida_spedizione(
-            destinatario_cap=_estrai_cap(destinatario["indirizzo"]),
+            destinatario_cap=_cap_destinatario(destinatario),
             destinatario_citta=destinatario["citta"],
             destinatario_provincia=destinatario["provincia"] or "",
             destinatario_paese=_iso2(destinatario["paese"]),
@@ -240,7 +247,7 @@ def conferma_spedizione(spedizione_id: str) -> SpedizioneResponse:
             destinatario_email=destinatario["email"] or "",
             destinatario_telefono=destinatario["telefono"] or "",
             destinatario_indirizzo=destinatario["indirizzo"],
-            destinatario_cap=_estrai_cap(destinatario["indirizzo"]),
+            destinatario_cap=_cap_destinatario(destinatario),
             destinatario_citta=destinatario["citta"],
             destinatario_provincia=destinatario["provincia"] or "",
             destinatario_paese=_iso2(destinatario["paese"]),
