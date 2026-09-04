@@ -6,6 +6,9 @@
   "type": "module",
   "main": "src/client.ts",
   "types": "src/client.ts",
+  "exports": {
+    ".": "./src/client.ts"
+  },
   "scripts": {
     "generate:types": "openapi-typescript openapi.json -o src/schema.ts",
     "refresh": "cd ../shipping-api && ./venv/bin/python scripts/export_openapi.py && cd ../client-ts && npm run generate:types"

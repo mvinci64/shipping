@@ -371,6 +371,13 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /** Health */
+        Health: {
+            /** Status */
+            status: string;
+            /** Db */
+            db: string;
+        };
         /** RichiestaCartonizzazione */
         RichiestaCartonizzazione: {
             /** Order Number */
@@ -1025,7 +1032,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["Health"];
                 };
             };
         };
