@@ -8,6 +8,20 @@ Durata sprint indicativa: 2 settimane. Le stime vanno adattate al fatto che oggi
 
 ---
 
+## Stato al 04/09/2026
+
+| Sprint | Stato |
+|---|---|
+| Sprint 1 — Scaffolding FastAPI | ✅ Chiuso |
+| Sprint 2 — FSM spedizione + DHL | ✅ Sostanzialmente chiuso (DHL in produzione dal 31/08/2026) — **debito tecnico aperto**: adapter BRT e interfaccia comune corriere, mai iniziati |
+| Sprint 3 — Etichette lotto reale + endpoint operativo | ✅ Chiuso |
+| Sprint 4 — `shipping-web` MVP | 🔶 In corso — scaffold e vista ordini da spedire (sola lettura) fatti; azione conferma+stampa dalla UI e auth/permessi ancora da fare |
+| Sprint 5 — Hardening e rollout | ⬜ Non iniziato |
+
+**Urgenza operativa**: 5 spedizioni reali previste nei prossimi giorni, operatività a partire dalla settimana dell'11/09/2026. Il flusso end-to-end (cartonizzazione → etichette colli con lotto reale → etichetta scatolone → scansione fine linea → bozza → conferma con gate sui colli → pickup) è **completo e testato**, utilizzabile oggi tramite `shipping-api` in locale (parla già con DB reale e MyDHL in produzione) anche senza `shipping-web` — vedi `procedura-giorno-produzione.md`. `shipping-web` è per ora solo di consultazione (`/spedizioni`, sola lettura): le azioni restano sulle chiamate dirette a `shipping-api`.
+
+---
+
 ## Sprint 1 — Consolidare Fase 1 e scaffolding FastAPI
 
 Obiettivo: chiudere i punti aperti dell'anagrafica configurazioni e avere `shipping-api` come progetto FastAPI reale, con la logica di `cartonize.py` esposta come endpoint.
