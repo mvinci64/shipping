@@ -271,10 +271,14 @@ def conferma_spedizione(spedizione_id: str) -> SpedizioneResponse:
         raise HTTPException(status_code=status, detail=str(exc)) from exc
 
     etichetta_b64 = risposta["documents"][0]["content"]
+    tracking_number = risposta["shipmentTrackingNumber"]
     aggiornata = db.conferma_spedizione(
         spedizione_id,
-        shipment_tracking_number=risposta["shipmentTrackingNumber"],
-        tracking_url=risposta.get("trackingUrl", ""),
+        shipment_tracking_number=tracking_number,
+        # NON risposta["trackingUrl"]: quello è l'URL dell'API DHL
+        # (express.api.dhl.com/...), non la pagina pubblica di
+        # tracciabilità che si può aprire nel browser.
+        tracking_url=f"https://www.dhl.com/it-it/home/tracciabilita.html?tracking-id={tracking_number}&submit=1",
         etichetta_pdf=base64.b64decode(etichetta_b64),
     )
     return SpedizioneResponse(**aggiornata)

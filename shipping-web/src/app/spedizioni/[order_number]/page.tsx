@@ -163,7 +163,18 @@ export default async function DettaglioSpedizione({
           {spedizione.data && stato === "ritirata" && (
             <div className="mt-3 flex flex-col gap-2">
               <p className="text-sm text-emerald-700 dark:text-emerald-400">
-                Ritirata — conferma ritiro {spedizione.data.dispatch_confirmation_number ?? "—"}
+                Ritirata — tracking {spedizione.data.shipment_tracking_number ?? "—"}
+                {spedizione.data.tracking_url && (
+                  <>
+                    {" "}
+                    (
+                    <a href={spedizione.data.tracking_url} target="_blank" className="underline">
+                      link
+                    </a>
+                    )
+                  </>
+                )}
+                {" "}— conferma ritiro {spedizione.data.dispatch_confirmation_number ?? "—"}
               </p>
               <a
                 href={`/spedizioni/${order_number}/etichetta-corriere`}
