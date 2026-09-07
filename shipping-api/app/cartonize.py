@@ -6,7 +6,8 @@ non censiti vengono segnalati come tali.
 """
 import math
 
-TARA_SCATOLONE_G = 500        # forfait — confermato dall'utente 04/09/2026, sostituisce la pesata 250g del 27/08
+TARA_SCATOLONE_G = 900        # pesata reale su ORD-20260721-4387 (07/09/2026) — sostituisce il forfait 500g del 04/09
+CARTA_RIEMPIMENTO_G = 500      # media di carta da riempimento per scatolone — aggiunta 07/09/2026, prima non contava
 
 POSTI_SCATOLONE = 6
 POSTI = {"WP50": 2, "WP40": 1}
@@ -92,7 +93,7 @@ def pack_cartons(boxes):
         posti = POSTI[fmt]
         target = next((c for c in cartons if c["posti_usati"] + posti <= POSTI_SCATOLONE), None)
         if target is None:
-            target = {"posti_usati": 0, "contenuto": [], "peso_g": TARA_SCATOLONE_G}
+            target = {"posti_usati": 0, "contenuto": [], "peso_g": TARA_SCATOLONE_G + CARTA_RIEMPIMENTO_G}
             cartons.append(target)
         target["posti_usati"] += posti
         target["contenuto"].append({"formato": fmt, "sku": sku, "pezzi": pezzi, "peso_g": peso})

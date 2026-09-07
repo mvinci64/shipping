@@ -73,6 +73,17 @@ def _iso2(paese: str) -> str:
     return codice
 
 
+def _prossima_data_spedizione() -> str:
+    """Oggi, o il prossimo giorno feriale se oggi è sabato/domenica — DHL
+    risponde 404 "product not available for the requested pickup date" su
+    /rates e /shipments per una data di weekend (nessun ritiro festivi
+    italiani: da rivedere se emerge un caso reale)."""
+    giorno = datetime.date.today()
+    while giorno.weekday() >= 5:
+        giorno += datetime.timedelta(days=1)
+    return giorno.isoformat()
+
+
 def _ordine_e_destinatario(order_number: str) -> tuple[dict, dict]:
     ordine = db.fetch_order(order_number)
     if ordine is None:
@@ -124,7 +135,7 @@ def valida_spedizione(order_number: str) -> dict:
     cliente da DB."""
     ordine, destinatario = _ordine_e_destinatario(order_number)
     pesi_kg = _pesi_scatoloni_kg(ordine)
-    risposta_dhl = _quota(destinatario, pesi_kg, datetime.date.today().isoformat())
+    risposta_dhl = _quota(destinatario, pesi_kg, _prossima_data_spedizione())
     return {
         "order_number": order_number,
         "n_scatoloni": len(pesi_kg),
@@ -139,7 +150,7 @@ def crea_bozza_spedizione(order_number: str) -> SpedizioneResponse:
     Nessuna chiamata DHL con effetto reale — solo /rates, come /valida."""
     ordine, destinatario = _ordine_e_destinatario(order_number)
     pesi_kg = _pesi_scatoloni_kg(ordine)
-    risposta_dhl = _quota(destinatario, pesi_kg, datetime.date.today().isoformat())
+    risposta_dhl = _quota(destinatario, pesi_kg, _prossima_data_spedizione())
     product_code, prezzo = _scegli_prodotto(risposta_dhl)
     bozza = db.crea_spedizione_bozza(
         order_number=order_number, corriere="dhl", product_code=product_code,
@@ -252,7 +263,7 @@ def conferma_spedizione(spedizione_id: str) -> SpedizioneResponse:
             destinatario_provincia=destinatario["provincia"] or "",
             destinatario_paese=_iso2(destinatario["paese"]),
             pesi_scatoloni_kg=spedizione["pesi_scatoloni_kg"],
-            data_spedizione_iso=datetime.date.today().isoformat(),
+            data_spedizione_iso=_prossima_data_spedizione(),
         )
     except (dhl.DHLConfigError, dhl.DHLAPIError) as exc:
         db.segna_spedizione_fallita(spedizione_id, errore=str(exc))

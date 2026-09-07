@@ -88,14 +88,13 @@ def make_inner_labels_pdf(
     lotti: dict | None = None,
     gtins: dict | None = None,
     nomi_prodotto: dict | None = None,
-    mostra_lotto: bool = True,
+    mostra_lotto: bool = False,
 ) -> bytes:
-    """mostra_lotto=False: stampa etichette in anticipo, prima che tutti i
-    prodotti dell'ordine siano stati prodotti (es. solo il primo della lista
-    è uscito dal laboratorio). In quel caso lotto/scadenza/barcode GS1 non
-    hanno senso per i prodotti non ancora fatti — vengono omessi del tutto
-    per l'intero ordine, non solo per lo SKU mancante, per non dare
-    l'impressione che l'informazione manchi solo per errore."""
+    """mostra_lotto=False (default, deciso dall'utente 07/09/2026): lotto e
+    scadenza non sono determinabili in modo affidabile (vedi nota su
+    easyfatt.tmovmagazz in cartonizzazioni.py), quindi vengono omessi sempre
+    dall'etichetta collo — il barcode GS1 resta col solo GTIN. mostra_lotto=
+    True resta disponibile per chi lo richiede esplicitamente."""
     from reportlab.lib.units import mm
     from reportlab.pdfgen import canvas
     from reportlab.graphics.barcode import code128

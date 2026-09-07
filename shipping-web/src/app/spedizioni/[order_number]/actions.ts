@@ -10,6 +10,7 @@ function messaggioErrore(error: unknown): string {
     const detail = (error as { detail: unknown }).detail;
     if (typeof detail === "string") return detail;
     if (Array.isArray(detail)) return detail.map((d) => (d as { msg?: string }).msg).filter(Boolean).join("; ");
+    if (detail && typeof detail === "object") return JSON.stringify(detail);
   }
   return "Errore sconosciuto";
 }

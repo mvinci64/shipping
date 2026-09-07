@@ -51,6 +51,41 @@ export default async function Spedizioni({
           </p>
         </div>
 
+        <form className="flex flex-wrap items-end gap-3 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
+          <label className="flex flex-col gap-1 text-sm text-zinc-700 dark:text-zinc-300">
+            Consegna dal
+            <input
+              type="date"
+              name="data_da"
+              defaultValue={data_da}
+              className="rounded border border-zinc-300 bg-white px-2 py-1 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm text-zinc-700 dark:text-zinc-300">
+            al
+            <input
+              type="date"
+              name="data_a"
+              defaultValue={data_a}
+              className="rounded border border-zinc-300 bg-white px-2 py-1 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+            />
+          </label>
+          <button
+            type="submit"
+            className="rounded bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+          >
+            Filtra
+          </button>
+          {(data_da || data_a) && (
+            <Link
+              href="/spedizioni"
+              className="rounded px-3 py-1.5 text-sm text-zinc-600 hover:underline dark:text-zinc-400"
+            >
+              Reimposta
+            </Link>
+          )}
+        </form>
+
         {!righe ? (
           <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
             Impossibile leggere l&apos;elenco (

@@ -176,10 +176,17 @@ export default async function DettaglioSpedizione({
           )}
 
           {spedizione.data && stato === "fallita" && (
-            <p className="mt-3 text-sm text-red-700 dark:text-red-400">
-              Fallita: {spedizione.data.errore ?? "errore sconosciuto"}. Nessun retry automatico — verificare i dati
-              e ricreare la bozza a mano se necessario.
-            </p>
+            <div className="mt-3 flex flex-col gap-2">
+              <p className="text-sm text-red-700 dark:text-red-400">
+                Fallita: {spedizione.data.errore ?? "errore sconosciuto"}. Nessun retry automatico — verificare i
+                dati e ricreare la bozza a mano se necessario.
+              </p>
+              <AzioneForm
+                action={creaBozzaAction.bind(null, order_number)}
+                etichetta="Ricrea bozza"
+                classi="bg-zinc-900 text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+              />
+            </div>
           )}
         </section>
       </main>

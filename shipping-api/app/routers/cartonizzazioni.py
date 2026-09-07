@@ -130,18 +130,17 @@ def cartonizzazione_ordine_reale(order_number: str) -> RisultatoCartonizzazione:
 
 
 @router.get("/cartonizzazioni/{order_number}/etichette-colli")
-def etichette_colli_ordine_reale(order_number: str, con_lotto: bool = True) -> Response:
+def etichette_colli_ordine_reale(order_number: str, con_lotto: bool = False) -> Response:
     """Etichette collo (WP50/WP40) per un ordine reale, letto dal DB.
-    Lotto/scadenza reali da easyfatt.tmovmagazz (ultimo carico per SKU);
-    se uno SKU non ha mai avuto un carico in EasyFatt resta il placeholder.
 
-    con_lotto=false: stampa in anticipo, quando solo alcuni SKU dell'ordine
-    sono già stati prodotti (es. un ordine con più prodotti, di cui oggi è
-    uscito dal laboratorio solo il primo) — lotto/scadenza verrebbero
-    disallineati per il resto dell'ordine, quindi vengono omessi per tutta
-    l'etichetta. Il barcode resta comunque (GTIN da solo, senza lotto):
-    identifica il prodotto anche quando lotto/scadenza non sono ancora
-    affidabili."""
+    con_lotto=false (default, deciso dall'utente 07/09/2026): lotto/scadenza
+    non sono determinabili in modo affidabile (easyfatt.tmovmagazz è scritta
+    da un ETL lanciato a mano, senza orario fisso — vedi Sprint 3 in
+    piano-sprint.md), quindi vengono omessi sempre dall'etichetta collo. Il
+    barcode resta comunque (GTIN da solo, senza lotto): identifica il
+    prodotto anche senza lotto/scadenza. con_lotto=true resta disponibile
+    per chi lo richiede esplicitamente, ma non è più il comportamento di
+    default della UI."""
     ordine = _ordine_reale(order_number)
     result = cartonize_order(ordine["righe"])
     skus = {item["sku"] for carton in result["scatoloni"] for item in carton["contenuto"]}
