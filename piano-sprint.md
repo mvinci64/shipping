@@ -94,6 +94,26 @@ Obiettivo: passare da MVP funzionante a servizio affidabile in produzione.
 
 Dipendenze: Sprint 4 completato.
 
+**Motivazione (07/09/2026)**: serve poter eseguire l'app anche dal computer del laboratorio, non solo dal laptop dell'utente — oggi tutto gira in locale (`localhost:8000`/`3000`).
+
+### Checklist deploy — cosa manca davvero (07/09/2026)
+
+**`shipping-api` (ECS Fargate)** — `Dockerfile` ed `ecs-task-definition.template.json` già pronti (Sprint 1), mancano le risorse AWS:
+1. Repo ECR `viscotta-shipping-api` + build/push immagine
+2. Ruolo IAM `viscotta-shipping-api-task-role` (accesso RDS) + execution role (accesso SSM)
+3. Parametri SSM reali sotto `/viscotta/shipping-api/` — 13 valori: `DATABASE_URL` + le 12 variabili `DHL_*` elencate nel template
+4. Servizio ECS + load balancer/target group — deve esporre un endpoint HTTP raggiungibile sia da `shipping-web` sia dal PC di laboratorio
+5. Security group RDS: aggiungere l'accesso dal nuovo task ECS (oggi il DB probabilmente accetta connessioni solo dall'IP del laptop dell'utente)
+
+**`shipping-web` (AppRunner)** — qui manca la configurazione stessa, non solo le risorse:
+6. Creare `shipping-web/AppRunner.yaml` (il Portal ce l'ha già come riferimento, questo repo non ancora)
+7. **Punto aperto non banale**: `shipping-web` dipende da `@viscotta/shipping-client` via `file:../client-ts` (symlink locale, richiede `turbopack.root` puntato alla cartella padre del repo — vedi Sprint 4). Un build AppRunner source-based clona la repo GitHub: da verificare se AppRunner prende l'intero monorepo o solo la sottocartella `shipping-web/` — nel secondo caso il build si rompe perché manca `../client-ts`. Se serve, valutare di pubblicare `client-ts` come pacchetto invece che come dipendenza `file:`
+8. `SHIPPING_API_URL` in `AppRunner.yaml` deve puntare all'endpoint ECS reale, non più `http://localhost:8000`
+
+**Trasversale**
+9. Autenticazione/permessi su `shipping-web` (ultimo punto aperto Sprint 4) — diventa più urgente appena l'app è raggiungibile da un altro computer, non solo dal laptop dell'utente in locale
+10. DNS/dominio interno per raggiungere `shipping-web`/`shipping-api` dal PC di laboratorio (oggi tutto su `localhost`)
+
 ---
 
 ## Strategia di deploy AWS
