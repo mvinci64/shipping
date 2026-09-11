@@ -42,6 +42,21 @@ export async function confermaSpedizioneAction(
   return { errore: null };
 }
 
+// Nessun effetto reale sul corriere: conferma solo che il collo è stato
+// fisicamente chiuso in reparto (viscotta.colli_confermati). Idempotente
+// lato backend — confermare due volte lo stesso collo non è un errore.
+export async function confermaColloAction(
+  orderNumber: string, indiceCollo: number, _prev: StatoAzione, _formData: FormData,
+): Promise<StatoAzione> {
+  const codice = `${orderNumber}-${String(indiceCollo).padStart(2, "0")}`;
+  const { error } = await shippingClient.POST("/cartonizzazioni/colli/conferma", {
+    body: { codice },
+  });
+  if (error) return { errore: messaggioErrore(error) };
+  revalidatePath(`/spedizioni/${orderNumber}`);
+  return { errore: null };
+}
+
 // EFFETTO REALE: prenota il ritiro DHL vero.
 export async function richiediPickupAction(
   spedizioneId: string, orderNumber: string, _prev: StatoAzione, formData: FormData,

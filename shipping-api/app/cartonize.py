@@ -22,11 +22,15 @@ SOVRAPPESO_CONFEZIONE_G = 6
 # Grammatura netta per pezzo — per gli SKU standard è il numero nel codice
 # (es. CHMS50 -> 50g); per VP08BUST/BOXOV/SCAT20V08, dove il codice non lo
 # esprime, il valore è stato confermato a parte dall'utente 04/09/2026.
+# MSAL1KG/CHMS1KG/CANTS1KG/GRM1KG (nuovi formati da 1kg, ciascuno diviso in
+# buste da 500g) — censiti dall'utente 09/09/2026, primo ordine reale
+# ORD-20260908-9232.
 GRAMMATURA_G = {
     "CHMS50": 50, "GRM100": 100, "CANTS100": 100, "CMEN080": 80, "MCIOC080": 80, "MSAL080": 80,
     "MPEL150": 150, "MSGU150": 150, "MPEL200": 200, "MSGU200": 200,
     "TCAP075": 75, "CANT200": 200, "BRUT150": 150,
     "VP08BUST": 160, "BOXOV": 150, "SCAT20V08": 160,
+    "MSAL1KG": 1000, "CHMS1KG": 1000, "CANTS1KG": 1000, "GRM1KG": 1000,
 }
 
 
@@ -42,7 +46,10 @@ PEZZI_PER_COLLO = {
     "CANTS100":  {"WP50": 24, "WP40": 12},
     "CMEN080":   {"WP50": 24, "WP40": 12},
     "MCIOC080":  {"WP50": 24, "WP40": 12},
-    "MSAL080":   {"WP50": 24, "WP40": 12},
+    # MSAL080 entra più fitto degli altri prodotti da 80g: capacità propria,
+    # non il forfait 24/12 condiviso col resto del gruppo — confermato
+    # dall'utente 09/09/2026 (36 pezzi pieni un WP50, 24 pieni un WP40).
+    "MSAL080":   {"WP50": 36, "WP40": 24},
     "MPEL150":   {"WP50": 24, "WP40": 12},
     "MSGU150":   {"WP50": 24, "WP40": 12},
     "MPEL200":   {"WP50": 24, "WP40": 12},
@@ -53,6 +60,10 @@ PEZZI_PER_COLLO = {
     "VP08BUST":  {"WP50": 12, "WP40": 6},
     "BOXOV":     {"WP40": 6},
     "SCAT20V08": {"WP40": 6},
+    "MSAL1KG":   {"WP50": 2, "WP40": 1},
+    "CHMS1KG":   {"WP50": 2, "WP40": 1},
+    "CANTS1KG":  {"WP50": 2, "WP40": 1},
+    "GRM1KG":    {"WP50": 2, "WP40": 1},
 }
 
 # sku: {formato: (pezzi, peso_g)} — peso ricalcolato dalla formula sopra,

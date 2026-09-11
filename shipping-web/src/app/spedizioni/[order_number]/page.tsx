@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { shippingClient } from "@/lib/shipping-client";
 import { AzioneForm } from "./AzioneForm";
-import { creaBozzaAction, confermaSpedizioneAction, richiediPickupAction } from "./actions";
+import { creaBozzaAction, confermaSpedizioneAction, richiediPickupAction, confermaColloAction } from "./actions";
 
 export const metadata = { title: "Dettaglio spedizione — VISCOTTA" };
 
@@ -86,6 +86,18 @@ export default async function DettaglioSpedizione({
             {colli.data?.confermati.length ?? 0}/{colli.data?.n_totale ?? 0}
             {collliCompleti ? " — completo ✓" : ""}
           </p>
+          {!collliCompleti && colli.data && colli.data.mancanti.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {colli.data.mancanti.map((indice) => (
+                <AzioneForm
+                  key={indice}
+                  action={confermaColloAction.bind(null, order_number, indice)}
+                  etichetta={`Conferma collo ${indice}/${colli.data!.n_totale}`}
+                  classi="bg-zinc-900 text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+                />
+              ))}
+            </div>
+          )}
         </section>
 
         <section className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
