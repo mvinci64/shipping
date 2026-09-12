@@ -16,7 +16,7 @@ Durata sprint indicativa: 2 settimane. Le stime vanno adattate al fatto che oggi
 | Sprint 2 — FSM spedizione + DHL | ✅ Sostanzialmente chiuso (DHL in produzione dal 31/08/2026) — **debito tecnico aperto**: adapter BRT e interfaccia comune corriere, mai iniziati |
 | Sprint 3 — Etichette lotto reale + endpoint operativo | ✅ Chiuso |
 | Sprint 4 — `shipping-web` MVP | 🔶 In corso — scaffold e vista ordini da spedire (sola lettura) fatti; azione conferma+stampa dalla UI e auth/permessi ancora da fare |
-| Sprint 5 — Hardening e rollout | 🔶 In corso — `shipping-api` in produzione su ECS Fargate (12/09/2026); `shipping-web` pronto, in attesa di DNS/certificato per `send.viscotta.com` |
+| Sprint 5 — Hardening e rollout | 🔶 In corso — `shipping-api` in produzione su ECS Fargate dietro `send.viscotta.com` (certificato ACM emesso, DNS su GoDaddy) e `shipping-web` in produzione su AppRunner (12/09/2026); restano gestione errori corriere, log/audit, pesature `derivato`, auth su `shipping-web`, dominio custom per `shipping-web` (oggi solo URL AppRunner di default) |
 
 **Urgenza operativa**: 5 spedizioni reali previste nei prossimi giorni, operatività a partire dalla settimana dell'11/09/2026. Il flusso end-to-end (cartonizzazione → etichette colli con lotto reale → etichetta scatolone → scansione fine linea → bozza → conferma con gate sui colli → pickup) è **completo e testato**, utilizzabile oggi tramite `shipping-api` in locale (parla già con DB reale e MyDHL in produzione) anche senza `shipping-web` — vedi `procedura-giorno-produzione.md`. `shipping-web` è per ora solo di consultazione (`/spedizioni`, sola lettura): le azioni restano sulle chiamate dirette a `shipping-api`.
 
@@ -108,12 +108,13 @@ Dipendenze: Sprint 4 completato.
 **`shipping-web` (AppRunner)** — pronto, non ancora deployato:
 6. ~~Creare `shipping-web/AppRunner.yaml`~~ — fatto, build in due passi (`cd ../client-ts && npm install` poi `shipping-web`) perché `client-ts/node_modules` non è versionato — verificato con una clone pulita del repo che la build passa
 7. ~~Punto aperto monorepo~~ — **risolto**: confermato che AppRunner source-based clona l'intero repo e usa `SourceDirectory` solo come working directory per i comandi — `../client-ts` è sempre raggiungibile, nessun bisogno di pubblicare `client-ts` come pacchetto
-8. `SHIPPING_API_URL` impostato a `https://send.viscotta.com` nell'`AppRunner.yaml` — **non ancora risolvibile**: manca il certificato ACM (richiede validazione DNS) e il record DNS su GoDaddy che punta all'ALB. **Deliberatamente non fatto in questa sessione** (fuori perimetro concordato con l'utente il 12/09/2026): finché DNS/certificato non sono pronti, il servizio AppRunner non verrebbe mai sano (la home page fa un health check reale verso `shipping-api`, che fallirebbe se il DNS non risolve) — meglio non crearlo e lasciarlo a un secondo tempo, per non consumare build/retry AppRunner a vuoto
-   - Passi residui, tutti fuori da questa sessione: richiedere certificato ACM per `send.viscotta.com` (validazione DNS, stesso pattern di `bi.viscotta.com`/`mrp.viscotta.com` — cert singolo per hostname, aggiunto come SNI aggiuntivo sul listener 443 dell'ALB condiviso), aggiungere il CNAME di validazione + il record finale su GoDaddy (DNS non è su Route53, nessuna hosted zone lì), poi creare il servizio AppRunner (`apprunner create-service`, connessione GitHub `apprunner` già esistente e già usata per `appviscotta`, verificare che copra anche il repo `mvinci64/shipping`)
+8. ~~`SHIPPING_API_URL`~~ — fatto, `https://send.viscotta.com`, verificato risolvibile e con TLS valido dal servizio AppRunner (le pagine `/` e `/spedizioni` rispondono 200, incluso l'health check reale verso shipping-api sulla home)
+
+Sequenza eseguita il 12/09/2026: `aws acm request-certificate` per `send.viscotta.com` (validazione DNS) → due CNAME aggiunti su GoDaddy (validazione + puntamento `send` → ALB) → certificato `ISSUED` → `aws elbv2 add-listener-certificates` (SNI aggiuntivo sul listener 443 di `viscotta-mrp-alb`, stesso pattern di `bi.viscotta.com`) → `aws apprunner create-service` per `shipping-web` (repo `mvinci64/shipping`, `SourceDirectory: shipping-web`, connessione GitHub `apprunner` esistente — copriva già anche questo repo, nessun problema di autorizzazione). Servizio `RUNNING`, URL AppRunner di default: `https://rutwjps8wk.eu-central-1.awsapprunner.com` — **nessun dominio custom ancora associato a `shipping-web`** (diverso da `shipping-api`, che è dietro `send.viscotta.com`).
 
 **Trasversale**
-9. Autenticazione/permessi su `shipping-web` — resta aperto, più urgente una volta raggiungibile da `send.viscotta.com`
-10. ~~DNS/dominio interno~~ — assorbito nel punto 8: il dominio pubblico `send.viscotta.com` serve sia per l'AppRunner sia per l'accesso da laboratorio, non serve più un dominio interno separato
+9. Autenticazione/permessi su `shipping-web` — resta aperto, più urgente ora che l'app è raggiungibile pubblicamente
+10. ~~DNS/dominio interno~~ — assorbito nel punto 8 per `shipping-api`; per `shipping-web` resta da decidere se serve un dominio dedicato (es. `spedizioni.viscotta.com`) o se l'URL AppRunner di default basta per l'uso da laboratorio
 
 ---
 
