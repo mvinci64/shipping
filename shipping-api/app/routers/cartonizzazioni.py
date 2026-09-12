@@ -24,7 +24,9 @@ class RichiestaCartonizzazione(BaseModel):
 
 
 class ScatolaInterna(BaseModel):
-    formato: str
+    # None per gli SKU sfusi (vedi cartonize.SFUSO_SKUS): niente scatola
+    # interna, i pezzi riempiono lo scatolone direttamente.
+    formato: str | None
     sku: str
     pezzi: int
     peso_g: int

@@ -125,11 +125,14 @@ def make_inner_labels_pdf(
             y -= 8.5 * mm
         y -= 6.5 * mm if len(righe_cliente) == 1 else 0
 
-        # SKU normale, formato (WP50/WP40) piccolo
+        # SKU normale, formato (WP50/WP40) piccolo — omesso per gli SKU
+        # sfusi (formato None): niente scatola interna, i pezzi riempiono
+        # lo scatolone direttamente, l'etichetta mostra solo la quantità.
         c.setFont("Helvetica-Bold", 14)
         c.drawString(margine, y, item["sku"])
-        c.setFont("Helvetica", 9)
-        c.drawString(margine + c.stringWidth(item["sku"], "Helvetica-Bold", 14) + 2 * mm, y, f"({item['formato']})")
+        if item["formato"]:
+            c.setFont("Helvetica", 9)
+            c.drawString(margine + c.stringWidth(item["sku"], "Helvetica-Bold", 14) + 2 * mm, y, f"({item['formato']})")
         y -= 8 * mm
 
         # nome prodotto: a fianco dello SKU, deve essere chiaro a colpo
@@ -222,7 +225,11 @@ def make_carton_summary_labels_pdf(
         y -= 6 * mm
         c.setFont("Helvetica", 9)
         for item in carton["contenuto"]:
-            c.drawString(margine + 2 * mm, y, f"1× {item['formato']}  {item['sku']}  ({item['pezzi']} pz)")
+            # SKU sfusi (formato None): niente scatola interna, riempiono
+            # lo scatolone direttamente — nessun "1× WPxx" da mostrare.
+            descrizione = f"1× {item['formato']}  {item['sku']}  ({item['pezzi']} pz)" if item["formato"] \
+                else f"{item['sku']}  ({item['pezzi']} pz, sfuso)"
+            c.drawString(margine + 2 * mm, y, descrizione)
             c.drawRightString(W - margine, y, f"{item['peso_g'] / 1000:.2f} kg")
             y -= 5 * mm
 

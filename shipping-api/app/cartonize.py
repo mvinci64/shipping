@@ -31,12 +31,27 @@ GRAMMATURA_G = {
     "TCAP075": 75, "CANT200": 200, "BRUT150": 150,
     "VP08BUST": 160, "BOXOV": 150, "SCAT20V08": 160,
     "MSAL1KG": 1000, "CHMS1KG": 1000, "CANTS1KG": 1000, "GRM1KG": 1000,
+    "TCAP200SC": 200,
 }
+
+# SKU "sfusi": niente scatola interna WP40/WP50, i pezzi riempiono
+# direttamente lo spazio residuo dello scatolone (nessuna tara scatola
+# interna nel peso, nessun posto occupato nello scatolone). L'etichetta
+# collo per questi SKU mostra solo la quantità, senza formato — deciso
+# dall'utente 11/09/2026, da validare con la pasticceria prima di
+# generalizzarlo ad altri SKU. Primi ordini reali: ORD-20260908-6587,
+# ORD-20260505-4944.
+SFUSO_SKUS = {"TCAP200SC"}
 
 
 def _peso_collo_g(sku: str, formato: str, pezzi: int) -> int:
     """peso = grammatura netta * pezzi + sovrappeso confezione * pezzi + tara scatola interna."""
     return pezzi * (GRAMMATURA_G[sku] + SOVRAPPESO_CONFEZIONE_G) + TARA_COLLO_G[formato]
+
+
+def _peso_sfuso_g(sku: str, pezzi: int) -> int:
+    """peso = grammatura netta * pezzi + sovrappeso confezione * pezzi — niente tara, non c'è scatola interna."""
+    return pezzi * (GRAMMATURA_G[sku] + SOVRAPPESO_CONFEZIONE_G)
 
 
 # sku: {formato: pezzi} — quanti pezzi entrano in ogni formato di scatola interna (censimento 26/08).
@@ -75,7 +90,11 @@ CONFEZIONI = {
 
 
 def cartonize_line(sku: str, qta: int):
-    """Riga d'ordine → lista di scatole interne [(formato, pezzi, peso_g)]."""
+    """Riga d'ordine → lista di scatole interne [(formato, pezzi, peso_g)].
+    Per gli SKU sfusi (vedi SFUSO_SKUS) formato è None: niente scatola
+    interna, un'unica riga con tutti i pezzi dell'ordine."""
+    if sku in SFUSO_SKUS:
+        return [(None, qta, _peso_sfuso_g(sku, qta))]
     conf = CONFEZIONI.get(sku)
     if conf is None:
         return None
@@ -98,10 +117,12 @@ def cartonize_line(sku: str, qta: int):
 
 
 def pack_cartons(boxes):
-    """Scatole interne → scatoloni (first-fit, WP50 prima)."""
+    """Scatole interne → scatoloni (first-fit, WP50 prima). Gli SKU sfusi
+    (fmt None) non occupano posti: riempiono lo scatolone corrente dopo
+    aver piazzato le scatole interne WP50/WP40."""
     cartons = []
-    for fmt, sku, pezzi, peso in sorted(boxes, key=lambda b: -POSTI[b[0]]):
-        posti = POSTI[fmt]
+    for fmt, sku, pezzi, peso in sorted(boxes, key=lambda b: -POSTI.get(b[0], 0)):
+        posti = POSTI.get(fmt, 0)
         target = next((c for c in cartons if c["posti_usati"] + posti <= POSTI_SCATOLONE), None)
         if target is None:
             target = {"posti_usati": 0, "contenuto": [], "peso_g": TARA_SCATOLONE_G + CARTA_RIEMPIMENTO_G}
