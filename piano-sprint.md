@@ -16,7 +16,7 @@ Durata sprint indicativa: 2 settimane. Le stime vanno adattate al fatto che oggi
 | Sprint 2 — FSM spedizione + DHL | ✅ Sostanzialmente chiuso (DHL in produzione dal 31/08/2026) — **debito tecnico aperto**: adapter BRT e interfaccia comune corriere, mai iniziati |
 | Sprint 3 — Etichette lotto reale + endpoint operativo | ✅ Chiuso |
 | Sprint 4 — `shipping-web` MVP | 🔶 In corso — scaffold e vista ordini da spedire (sola lettura) fatti; azione conferma+stampa dalla UI e auth/permessi ancora da fare |
-| Sprint 5 — Hardening e rollout | 🔶 In corso — `shipping-api` (ECS Fargate, `send.viscotta.com`) e `shipping-web` (AppRunner, `spedizioni.viscotta.com`) entrambi in produzione dal 12/09/2026; restano gestione errori corriere, log/audit, pesature `derivato`, auth su `shipping-web` |
+| Sprint 5 — Hardening e rollout | 🔶 In corso — `shipping-api` (ECS Fargate, `send.viscotta.com`) e `shipping-web` (AppRunner, `spedizioni.viscotta.com`) entrambi in produzione con autenticazione (solo ruolo `admin`) dal 12/09/2026; restano gestione errori corriere, log/audit, pesature `derivato`, eventuale account admin per il reparto |
 
 **Urgenza operativa**: 5 spedizioni reali previste nei prossimi giorni, operatività a partire dalla settimana dell'11/09/2026. Il flusso end-to-end (cartonizzazione → etichette colli con lotto reale → etichetta scatolone → scansione fine linea → bozza → conferma con gate sui colli → pickup) è **completo e testato**, utilizzabile oggi tramite `shipping-api` in locale (parla già con DB reale e MyDHL in produzione) anche senza `shipping-web` — vedi `procedura-giorno-produzione.md`. `shipping-web` è per ora solo di consultazione (`/spedizioni`, sola lettura): le azioni restano sulle chiamate dirette a `shipping-api`.
 
@@ -115,7 +115,10 @@ Sequenza eseguita il 12/09/2026: `aws acm request-certificate` per `send.viscott
 Dominio custom aggiunto lo stesso giorno: `aws apprunner associate-custom-domain --domain-name spedizioni.viscotta.com` — a differenza dell'ALB, qui è AppRunner stesso a generare e gestire il certificato ACM (due CNAME di validazione, non uno) più il CNAME finale verso l'URL AppRunner di default; tutti e tre aggiunti su GoDaddy nello stesso passaggio. `shipping-web` è quindi raggiungibile sia su `https://spedizioni.viscotta.com` sia sull'URL AppRunner di default.
 
 **Trasversale**
-9. Autenticazione/permessi su `shipping-web` — resta aperto, più urgente ora che l'app è raggiungibile pubblicamente su `spedizioni.viscotta.com`
+9. ~~Autenticazione/permessi su `shipping-web`~~ — fatto (12/09/2026): login con gli account reali del Portal (`viscotta.users`/`password_hash`, stesso bcrypt), sessione separata in `viscotta.sessions` (nuovo login, non il cookie del Portal — domini diversi, `spedizioni.viscotta.com` non riceverebbe comunque il cookie di `app.viscotta.com`). **Accesso limitato al ruolo `admin`**: verificato sul DB reale che il ruolo `agent` è usato per agenti commerciali esterni (Procino, DM Lab, Savini, Tasillo, Telotti — non personale di reparto), quindi escluso. Oggi solo `admin@viscotta.local` e `vinci@viscotta.local` possono accedere — **se serve un accesso per Vincenza/reparto va creato un account con ruolo admin sul Portal**, non ancora fatto.
+   - `shipping-api`: nuovi endpoint `POST /auth/login`, `GET /auth/session`, `POST /auth/logout` (`app/routers/auth.py`)
+   - `shipping-web`: pagina `/login`, `proxy.ts` (Next.js 16 — "middleware" è deprecato, rinominato "proxy") che protegge tutte le rotte tranne `/login` validando il cookie ad ogni richiesta contro `shipping-api`, route `/logout`
+   - Verificato end-to-end in locale (redirect senza cookie, messaggi di errore generici sia per password sbagliata sia per account non-admin — non si distingue lato utente per non rivelare quali account esistono) e in produzione (redirect 307 su `/spedizioni` senza cookie, `/login` raggiungibile, `/auth/session` 401 senza token)
 10. ~~DNS/dominio~~ — fatto per entrambi: `shipping-api` su `send.viscotta.com`, `shipping-web` su `spedizioni.viscotta.com`
 
 ---
