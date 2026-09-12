@@ -262,7 +262,12 @@ WITH confezioni (sku, pz_wp50, pz_wp40, peso_wp50_kg, peso_wp40_kg) AS (
         ('BRUT150',   12,    6, 2.25, 1.20),
         ('VP08BUST',  12,    6, 2.25, 1.20),
         ('BOXOV',   NULL,    6, NULL, 1.45),   -- 220 g/pezzo, solo WP40
-        ('SCAT20V08', NULL,  6, NULL, 1.45)    -- 220 g/pezzo, solo WP40
+        ('SCAT20V08', NULL,  6, NULL, 1.45),   -- 220 g/pezzo, solo WP40
+        -- formati da 1kg (censiti 09/09/2026, vedi cartonize.py): 2 per WP50, 1 per WP40
+        ('MSAL1KG',    2,    1, NULL, NULL),
+        ('CHMS1KG',    2,    1, NULL, NULL),
+        ('CANTS1KG',   2,    1, NULL, NULL),
+        ('GRM1KG',     2,    1, NULL, NULL)
 ),
 sfusi (sku) AS (
     -- SKU "sfusi": niente scatola interna WP40/WP50, i pezzi vanno diretti
