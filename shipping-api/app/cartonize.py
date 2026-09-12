@@ -32,16 +32,30 @@ GRAMMATURA_G = {
     "VP08BUST": 160, "BOXOV": 150, "SCAT20V08": 160,
     "MSAL1KG": 1000, "CHMS1KG": 1000, "CANTS1KG": 1000, "GRM1KG": 1000,
     "TCAP200SC": 200,
+    # Scatole regalo/Natale (SKU confermati 12/09/2026, prima "da confermare"
+    # — vedi valutazione-cartonizzazione.md). Qui "grammatura" è il peso
+    # dell'intera confezione (non del singolo pasticcino: queste SKU sono
+    # vendute come scatola assortita, ogni unità ordinata = una scatola),
+    # dato dall'utente: 100g le scatole da 5 pezzi, 200g quelle da 10,
+    # indipendentemente da regalo/natalizia; Marunetta e Spiritose pesate
+    # a parte (box da 6, ricette diverse).
+    "SCATR05A": 100, "SCATRN05A": 100,
+    "SCATR10A": 200, "SCATRN10A": 200,
+    "SCATM06M": 180,
+    "SCATM06SR": 150, "SCATM06SA": 150,
 }
 
 # SKU "sfusi": niente scatola interna WP40/WP50, i pezzi riempiono
 # direttamente lo spazio residuo dello scatolone (nessuna tara scatola
 # interna nel peso, nessun posto occupato nello scatolone). L'etichetta
 # collo per questi SKU mostra solo la quantità, senza formato — deciso
-# dall'utente 11/09/2026, da validare con la pasticceria prima di
-# generalizzarlo ad altri SKU. Primi ordini reali: ORD-20260908-6587,
-# ORD-20260505-4944.
-SFUSO_SKUS = {"TCAP200SC"}
+# dall'utente 11/09/2026 per TCAP200SC, esteso alle scatole regalo/Natale
+# il 12/09/2026. Primi ordini reali: ORD-20260908-6587, ORD-20260505-4944.
+SFUSO_SKUS = {
+    "TCAP200SC",
+    "SCATR05A", "SCATR10A", "SCATRN05A", "SCATRN10A",
+    "SCATM06M", "SCATM06SR", "SCATM06SA",
+}
 
 
 def _peso_collo_g(sku: str, formato: str, pezzi: int) -> int:
