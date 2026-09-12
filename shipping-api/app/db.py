@@ -451,3 +451,110 @@ def fetch_ultima_spedizione_per_ordine(order_number: str) -> dict | None:
             (order_number,),
         ).fetchone()
     return _spedizione_da_riga(row) if row else None
+
+
+def fetch_user_by_email(email: str) -> dict | None:
+    """Utente reale del Portal (viscotta.users/user_roles) — stesso account,
+    stesso hash bcrypt. None se non esiste o non ha nessun ruolo "admin"
+    (unico ruolo che dà accesso al reparto: "agent" nel Portal indica agenti
+    commerciali esterni, non personale di magazzino)."""
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT id, email, full_name, password_hash, is_active
+            FROM viscotta.users
+            WHERE lower(email) = lower(%s)
+            """,
+            (email,),
+        ).fetchone()
+        if row is None:
+            return None
+        user_id, email_reale, full_name, password_hash, is_active = row
+
+        ruoli = conn.execute(
+            "SELECT role::text FROM viscotta.user_roles WHERE user_id = %s",
+            (user_id,),
+        ).fetchall()
+
+    return {
+        "id": str(user_id),
+        "email": email_reale,
+        "full_name": full_name,
+        "password_hash": password_hash,
+        "is_active": is_active,
+        "roles": [r for (r,) in ruoli],
+    }
+
+
+def create_session(user_id: str, ip_address: str | None, user_agent: str | None, ttl_giorni: int = 7) -> tuple[str, str]:
+    """Crea una sessione in viscotta.sessions (stessa tabella del Portal,
+    login separato). Ritorna (token in chiaro, expires_at ISO) — solo
+    l'hash SHA-256 del token viene salvato, come fa il Portal."""
+    import datetime
+    import hashlib
+    import secrets
+
+    token = secrets.token_hex(32)
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=ttl_giorni)
+
+    with get_connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO viscotta.sessions (user_id, token_hash, expires_at, ip_address, user_agent, last_seen_at)
+            VALUES (%s, %s, %s, %s, %s, now())
+            """,
+            (user_id, token_hash, expires_at, ip_address, user_agent),
+        )
+        conn.commit()
+
+    return token, expires_at.isoformat()
+
+
+def fetch_session_user(token: str) -> dict | None:
+    """Utente per un token di sessione valido (non scaduto, non revocato,
+    account attivo, ruolo admin). None altrimenti — niente distinzione tra
+    i vari casi di invalidità, al chiamante interessa solo autorizzato/no."""
+    import hashlib
+
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT u.id, u.email, u.full_name
+            FROM viscotta.sessions s
+            JOIN viscotta.users u ON u.id = s.user_id
+            WHERE s.token_hash = %s
+              AND s.revoked_at IS NULL
+              AND s.expires_at > now()
+              AND u.is_active
+            """,
+            (token_hash,),
+        ).fetchone()
+        if row is None:
+            return None
+        user_id, email, full_name = row
+
+        ruoli = conn.execute(
+            "SELECT role::text FROM viscotta.user_roles WHERE user_id = %s",
+            (user_id,),
+        ).fetchall()
+
+    ruoli = [r for (r,) in ruoli]
+    if "admin" not in ruoli:
+        return None
+
+    return {"id": str(user_id), "email": email, "full_name": full_name, "roles": ruoli}
+
+
+def revoke_session(token: str) -> None:
+    import hashlib
+
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE viscotta.sessions SET revoked_at = now() WHERE token_hash = %s AND revoked_at IS NULL",
+            (token_hash,),
+        )
+        conn.commit()

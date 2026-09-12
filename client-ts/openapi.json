@@ -123,7 +123,7 @@
     "/cartonizzazioni/{order_number}/etichette-colli": {
       "get": {
         "summary": "Etichette Colli Ordine Reale",
-        "description": "Etichette collo (WP50/WP40) per un ordine reale, letto dal DB.\nLotto/scadenza reali da easyfatt.tmovmagazz (ultimo carico per SKU);\nse uno SKU non ha mai avuto un carico in EasyFatt resta il placeholder.\n\ncon_lotto=false: stampa in anticipo, quando solo alcuni SKU dell'ordine\nsono già stati prodotti (es. un ordine con più prodotti, di cui oggi è\nuscito dal laboratorio solo il primo) — lotto/scadenza verrebbero\ndisallineati per il resto dell'ordine, quindi vengono omessi per tutta\nl'etichetta. Il barcode resta comunque (GTIN da solo, senza lotto):\nidentifica il prodotto anche quando lotto/scadenza non sono ancora\naffidabili.",
+        "description": "Etichette collo (WP50/WP40) per un ordine reale, letto dal DB.\n\ncon_lotto=false (default, deciso dall'utente 07/09/2026): lotto/scadenza\nnon sono determinabili in modo affidabile (easyfatt.tmovmagazz è scritta\nda un ETL lanciato a mano, senza orario fisso — vedi Sprint 3 in\npiano-sprint.md), quindi vengono omessi sempre dall'etichetta collo. Il\nbarcode resta comunque (GTIN da solo, senza lotto): identifica il\nprodotto anche senza lotto/scadenza. con_lotto=true resta disponibile\nper chi lo richiede esplicitamente, ma non è più il comportamento di\ndefault della UI.",
         "operationId": "etichette_colli_ordine_reale_cartonizzazioni__order_number__etichette_colli_get",
         "parameters": [
           {
@@ -141,7 +141,7 @@
             "required": false,
             "schema": {
               "type": "boolean",
-              "default": true,
+              "default": false,
               "title": "Con Lotto"
             }
           }
@@ -777,6 +777,111 @@
         }
       }
     },
+    "/auth/login": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Login",
+        "operationId": "login_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/session": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Session",
+        "operationId": "session_auth_session_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UtenteResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Logout",
+        "operationId": "logout_auth_logout_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LogoutRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Logout Auth Logout Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "summary": "Health",
@@ -828,6 +933,59 @@
           "db"
         ],
         "title": "Health"
+      },
+      "LoginRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "password": {
+            "type": "string",
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "LoginRequest"
+      },
+      "LoginResponse": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "expires_at": {
+            "type": "string",
+            "title": "Expires At"
+          },
+          "user": {
+            "$ref": "#/components/schemas/UtenteResponse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token",
+          "expires_at",
+          "user"
+        ],
+        "title": "LoginResponse"
+      },
+      "LogoutRequest": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "title": "LogoutRequest"
       },
       "RichiestaCartonizzazione": {
         "properties": {
@@ -995,7 +1153,14 @@
       "ScatolaInterna": {
         "properties": {
           "formato": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Formato"
           },
           "sku": {
@@ -1239,6 +1404,32 @@
           "completo"
         ],
         "title": "StatoColli"
+      },
+      "UtenteResponse": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "full_name": {
+            "type": "string",
+            "title": "Full Name"
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Roles"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "full_name",
+          "roles"
+        ],
+        "title": "UtenteResponse"
       },
       "ValidationError": {
         "properties": {

@@ -2,11 +2,12 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 
 from app import db
-from app.routers import cartonizzazioni, spedizioni
+from app.routers import auth, cartonizzazioni, spedizioni
 
 app = FastAPI(title="VISCOTTA Shipping API")
 app.include_router(cartonizzazioni.router)
 app.include_router(spedizioni.router)
+app.include_router(auth.router)
 
 
 class Health(BaseModel):

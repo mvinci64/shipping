@@ -41,14 +41,21 @@ export default async function Spedizioni({
   return (
     <div className="flex flex-1 flex-col items-center bg-zinc-50 font-sans dark:bg-black">
       <main className="flex w-full max-w-4xl flex-1 flex-col gap-6 px-8 py-16">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-black dark:text-zinc-50">
-            Ordini da spedire
-          </h1>
-          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-            Prossime due settimane, salvo filtro esplicito. Nessuna azione da questa vista — clicca un ordine per il
-            dettaglio.
-          </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-black dark:text-zinc-50">
+              Ordini da spedire
+            </h1>
+            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+              Prossime due settimane, salvo filtro esplicito. Nessuna azione da questa vista — clicca un ordine per il
+              dettaglio.
+            </p>
+          </div>
+          <form action="/logout" method="POST">
+            <button type="submit" className="text-sm text-zinc-500 hover:underline dark:text-zinc-400">
+              Esci
+            </button>
+          </form>
         </div>
 
         <form className="flex flex-wrap items-end gap-3 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">

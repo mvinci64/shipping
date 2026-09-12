@@ -73,16 +73,15 @@ export interface paths {
         /**
          * Etichette Colli Ordine Reale
          * @description Etichette collo (WP50/WP40) per un ordine reale, letto dal DB.
-         *     Lotto/scadenza reali da easyfatt.tmovmagazz (ultimo carico per SKU);
-         *     se uno SKU non ha mai avuto un carico in EasyFatt resta il placeholder.
          *
-         *     con_lotto=false: stampa in anticipo, quando solo alcuni SKU dell'ordine
-         *     sono già stati prodotti (es. un ordine con più prodotti, di cui oggi è
-         *     uscito dal laboratorio solo il primo) — lotto/scadenza verrebbero
-         *     disallineati per il resto dell'ordine, quindi vengono omessi per tutta
-         *     l'etichetta. Il barcode resta comunque (GTIN da solo, senza lotto):
-         *     identifica il prodotto anche quando lotto/scadenza non sono ancora
-         *     affidabili.
+         *     con_lotto=false (default, deciso dall'utente 07/09/2026): lotto/scadenza
+         *     non sono determinabili in modo affidabile (easyfatt.tmovmagazz è scritta
+         *     da un ETL lanciato a mano, senza orario fisso — vedi Sprint 3 in
+         *     piano-sprint.md), quindi vengono omessi sempre dall'etichetta collo. Il
+         *     barcode resta comunque (GTIN da solo, senza lotto): identifica il
+         *     prodotto anche senza lotto/scadenza. con_lotto=true resta disponibile
+         *     per chi lo richiede esplicitamente, ma non è più il comportamento di
+         *     default della UI.
          */
         get: operations["etichette_colli_ordine_reale_cartonizzazioni__order_number__etichette_colli_get"];
         put?: never;
@@ -393,6 +392,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Login */
+        post: operations["login_auth_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Session */
+        get: operations["session_auth_session_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Logout */
+        post: operations["logout_auth_logout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -425,6 +475,26 @@ export interface components {
             status: string;
             /** Db */
             db: string;
+        };
+        /** LoginRequest */
+        LoginRequest: {
+            /** Email */
+            email: string;
+            /** Password */
+            password: string;
+        };
+        /** LoginResponse */
+        LoginResponse: {
+            /** Token */
+            token: string;
+            /** Expires At */
+            expires_at: string;
+            user: components["schemas"]["UtenteResponse"];
+        };
+        /** LogoutRequest */
+        LogoutRequest: {
+            /** Token */
+            token: string;
         };
         /** RichiestaCartonizzazione */
         RichiestaCartonizzazione: {
@@ -487,7 +557,7 @@ export interface components {
         /** ScatolaInterna */
         ScatolaInterna: {
             /** Formato */
-            formato: string;
+            formato: string | null;
             /** Sku */
             sku: string;
             /** Pezzi */
@@ -554,6 +624,15 @@ export interface components {
             mancanti: number[];
             /** Completo */
             completo: boolean;
+        };
+        /** UtenteResponse */
+        UtenteResponse: {
+            /** Email */
+            email: string;
+            /** Full Name */
+            full_name: string;
+            /** Roles */
+            roles: string[];
         };
         /** ValidationError */
         ValidationError: {
@@ -1134,6 +1213,94 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SpedizioneResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    login_auth_login_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    session_auth_session_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UtenteResponse"];
+                };
+            };
+        };
+    };
+    logout_auth_logout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LogoutRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */
