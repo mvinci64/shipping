@@ -16,7 +16,7 @@ Durata sprint indicativa: 2 settimane. Le stime vanno adattate al fatto che oggi
 | Sprint 2 — FSM spedizione + DHL | ✅ Sostanzialmente chiuso (DHL in produzione dal 31/08/2026) — **debito tecnico aperto**: adapter BRT e interfaccia comune corriere, mai iniziati |
 | Sprint 3 — Etichette lotto reale + endpoint operativo | ✅ Chiuso |
 | Sprint 4 — `shipping-web` MVP | 🔶 In corso — scaffold e vista ordini da spedire (sola lettura) fatti; azione conferma+stampa dalla UI e auth/permessi ancora da fare |
-| Sprint 5 — Hardening e rollout | ⬜ Non iniziato |
+| Sprint 5 — Hardening e rollout | 🔶 In corso — `shipping-api` in produzione su ECS Fargate (12/09/2026); `shipping-web` pronto, in attesa di DNS/certificato per `send.viscotta.com` |
 
 **Urgenza operativa**: 5 spedizioni reali previste nei prossimi giorni, operatività a partire dalla settimana dell'11/09/2026. Il flusso end-to-end (cartonizzazione → etichette colli con lotto reale → etichetta scatolone → scansione fine linea → bozza → conferma con gate sui colli → pickup) è **completo e testato**, utilizzabile oggi tramite `shipping-api` in locale (parla già con DB reale e MyDHL in produzione) anche senza `shipping-web` — vedi `procedura-giorno-produzione.md`. `shipping-web` è per ora solo di consultazione (`/spedizioni`, sola lettura): le azioni restano sulle chiamate dirette a `shipping-api`.
 
@@ -96,23 +96,24 @@ Dipendenze: Sprint 4 completato.
 
 **Motivazione (07/09/2026)**: serve poter eseguire l'app anche dal computer del laboratorio, non solo dal laptop dell'utente — oggi tutto gira in locale (`localhost:8000`/`3000`).
 
-### Checklist deploy — cosa manca davvero (07/09/2026)
+### Checklist deploy — stato al 12/09/2026
 
-**`shipping-api` (ECS Fargate)** — `Dockerfile` ed `ecs-task-definition.template.json` già pronti (Sprint 1), mancano le risorse AWS:
-1. Repo ECR `viscotta-shipping-api` + build/push immagine
-2. Ruolo IAM `viscotta-shipping-api-task-role` (accesso RDS) + execution role (accesso SSM)
-3. Parametri SSM reali sotto `/viscotta/shipping-api/` — 13 valori: `DATABASE_URL` + le 12 variabili `DHL_*` elencate nel template
-4. Servizio ECS + load balancer/target group — deve esporre un endpoint HTTP raggiungibile sia da `shipping-web` sia dal PC di laboratorio
-5. Security group RDS: aggiungere l'accesso dal nuovo task ECS (oggi il DB probabilmente accetta connessioni solo dall'IP del laptop dell'utente)
+**`shipping-api` (ECS Fargate)** — ✅ **in produzione**:
+1. ~~Repo ECR `viscotta-shipping-api` + build/push immagine~~ — fatto
+2. ~~Ruolo IAM ... + execution role (accesso SSM)~~ — **niente ruolo task dedicato**: verificato sul task definition reale di miniMRP che `executionRoleArn`/`taskRoleArn` puntano entrambi a `viscottaEcsTaskExecutionRole` (nessun task role separato, shipping-api non chiama altri servizi AWS dal codice). Aggiornato `ecs-task-definition.template.json` di conseguenza; aggiunta policy inline `ViscottaShippingApiEcsPolicy` (lettura `/viscotta/shipping-api/*`) allo stesso ruolo, scoped come quella già esistente per `/viscotta/mrp/*`
+3. ~~Parametri SSM reali~~ — fatto, 16 `SecureString` sotto `/viscotta/shipping-api/*` da `shipping-api/.env`
+4. ~~Servizio ECS + load balancer/target group~~ — fatto: nuovo servizio `viscotta-shipping-api` nel cluster condiviso `viscotta-mrp-cluster` (stesso pattern di miniMRP/Metabase, un cluster logico per più servizi), target group `viscotta-shipping-api-tg` (porta 8000, health check `/health`) agganciato all'ALB condiviso `viscotta-mrp-alb` con una regola host-header per `send.viscotta.com` (priorità 90, stesso pattern di `bi.viscotta.com`). Verificato end-to-end: `curl --resolve send.viscotta.com:443:<IP-ALB> https://send.viscotta.com/health` → `{"status":"ok","db":"ok"}`
+5. ~~Security group RDS~~ — **non serviva**: la SG di RDS ha già una regola per l'intero CIDR della VPC (`172.31.0.0/16`, VPC di default), che copre qualunque task ECS lanciato nelle stesse subnet — nessuna modifica necessaria. Creata comunque `viscotta-shipping-api-sg` dedicata (solo per isolare il task, non per l'accesso RDS) con ingress 8000 dalla SG dell'ALB
 
-**`shipping-web` (AppRunner)** — qui manca la configurazione stessa, non solo le risorse:
-6. Creare `shipping-web/AppRunner.yaml` (il Portal ce l'ha già come riferimento, questo repo non ancora)
-7. **Punto aperto non banale**: `shipping-web` dipende da `@viscotta/shipping-client` via `file:../client-ts` (symlink locale, richiede `turbopack.root` puntato alla cartella padre del repo — vedi Sprint 4). Un build AppRunner source-based clona la repo GitHub: da verificare se AppRunner prende l'intero monorepo o solo la sottocartella `shipping-web/` — nel secondo caso il build si rompe perché manca `../client-ts`. Se serve, valutare di pubblicare `client-ts` come pacchetto invece che come dipendenza `file:`
-8. `SHIPPING_API_URL` in `AppRunner.yaml` deve puntare all'endpoint ECS reale, non più `http://localhost:8000`
+**`shipping-web` (AppRunner)** — pronto, non ancora deployato:
+6. ~~Creare `shipping-web/AppRunner.yaml`~~ — fatto, build in due passi (`cd ../client-ts && npm install` poi `shipping-web`) perché `client-ts/node_modules` non è versionato — verificato con una clone pulita del repo che la build passa
+7. ~~Punto aperto monorepo~~ — **risolto**: confermato che AppRunner source-based clona l'intero repo e usa `SourceDirectory` solo come working directory per i comandi — `../client-ts` è sempre raggiungibile, nessun bisogno di pubblicare `client-ts` come pacchetto
+8. `SHIPPING_API_URL` impostato a `https://send.viscotta.com` nell'`AppRunner.yaml` — **non ancora risolvibile**: manca il certificato ACM (richiede validazione DNS) e il record DNS su GoDaddy che punta all'ALB. **Deliberatamente non fatto in questa sessione** (fuori perimetro concordato con l'utente il 12/09/2026): finché DNS/certificato non sono pronti, il servizio AppRunner non verrebbe mai sano (la home page fa un health check reale verso `shipping-api`, che fallirebbe se il DNS non risolve) — meglio non crearlo e lasciarlo a un secondo tempo, per non consumare build/retry AppRunner a vuoto
+   - Passi residui, tutti fuori da questa sessione: richiedere certificato ACM per `send.viscotta.com` (validazione DNS, stesso pattern di `bi.viscotta.com`/`mrp.viscotta.com` — cert singolo per hostname, aggiunto come SNI aggiuntivo sul listener 443 dell'ALB condiviso), aggiungere il CNAME di validazione + il record finale su GoDaddy (DNS non è su Route53, nessuna hosted zone lì), poi creare il servizio AppRunner (`apprunner create-service`, connessione GitHub `apprunner` già esistente e già usata per `appviscotta`, verificare che copra anche il repo `mvinci64/shipping`)
 
 **Trasversale**
-9. Autenticazione/permessi su `shipping-web` (ultimo punto aperto Sprint 4) — diventa più urgente appena l'app è raggiungibile da un altro computer, non solo dal laptop dell'utente in locale
-10. DNS/dominio interno per raggiungere `shipping-web`/`shipping-api` dal PC di laboratorio (oggi tutto su `localhost`)
+9. Autenticazione/permessi su `shipping-web` — resta aperto, più urgente una volta raggiungibile da `send.viscotta.com`
+10. ~~DNS/dominio interno~~ — assorbito nel punto 8: il dominio pubblico `send.viscotta.com` serve sia per l'AppRunner sia per l'accesso da laboratorio, non serve più un dominio interno separato
 
 ---
 

@@ -5,7 +5,7 @@
   "cpu": "256",
   "memory": "512",
   "executionRoleArn": "arn:aws:iam::<ACCOUNT_ID>:role/viscottaEcsTaskExecutionRole",
-  "taskRoleArn": "arn:aws:iam::<ACCOUNT_ID>:role/viscotta-shipping-api-task-role",
+  "taskRoleArn": "arn:aws:iam::<ACCOUNT_ID>:role/viscottaEcsTaskExecutionRole",
   "containerDefinitions": [
     {
       "name": "shipping-api",

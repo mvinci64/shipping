@@ -1,0 +1,23 @@
+version: 1.0
+runtime: nodejs22
+
+# shipping-web vive nello stesso repo (monorepo) di shipping-api e client-ts.
+# AppRunner source-based clona l'intero repo GitHub e poi esegue i comandi
+# con working directory = SourceDirectory (questa cartella) — quindi
+# ../client-ts è raggiungibile. client-ts non ha però un proprio node_modules
+# committato (gitignored): va installato esplicitamente prima di quello di
+# shipping-web, altrimenti la risoluzione di "openapi-fetch" fallisce.
+build:
+  commands:
+    build:
+      - cd ../client-ts && npm install
+      - cd ../shipping-web && npm install && npm run build
+
+run:
+  runtime-version: 22
+  command: npm start
+  network:
+    port: 3000
+  env:
+    - name: SHIPPING_API_URL
+      value: "https://send.viscotta.com"
