@@ -150,7 +150,7 @@ Da fare quando si passa al deploy reale (fuori scope finché non ci sono ambient
 | ~~Credenziali MyDHL API + account number non disponibili~~ — arrivate, app in produzione dal 31/08/2026 | Risolto | Sprint 2 |
 | ~~Tara e dimensioni reali dello scatolone da pesare~~ — pesata 27/08/2026: 250 g | Risolto | Sprint 1 |
 | Pesature dei colli marcati `derivato` | Alcuni pesi restano "da verificare" in etichetta | Sprint 1, Sprint 5 |
-| SKU definitivi scatole regalo/Natale | Cartonizzazione di quei prodotti resta incompleta | Sprint 1 |
+| ~~SKU definitivi scatole regalo/Natale~~ — confermati e pesati dall'utente 12/09/2026: `SCATR05A`/`SCATRN05A` (100 g), `SCATR10A`/`SCATRN10A` (200 g), `SCATM06M` (180 g), `SCATM06SR`/`SCATM06SA` (150 g). Trattati come "sfusi" (stesso meccanismo di `TCAP200SC`, Sprint 5): niente scatola interna WP40/WP50, etichetta collo senza formato — vedi `SFUSO_SKUS`/`GRAMMATURA_G` in `shipping-api/app/cartonize.py` | Risolto | Sprint 1 |
 | ~~Conferma stato ordine "in prenotazione"~~ — confermato: `status = 'submitted'` E `crm_opportunity_id IS NOT NULL` (deve esistere l'Opportunity in CRM, non basta il submit sul Portal — 18 ordini storici erano `submitted`/`crm_export_status='exported'` ma senza Opportunity) | Risolto | Sprint 1 |
 | Team produzione+packaging+spedizione condiviso (3 persone) | Il coordinamento implicito oggi va reso esplicito nel sistema — impatta UX di Sprint 4 | Sprint 4 |
 | ~~App developer.dhl.com in stato "pending"~~ — sbloccata da Alessandro Menna, poi promossa a produzione il 31/08/2026 | Risolto | Sprint 2 |

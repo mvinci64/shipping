@@ -263,8 +263,19 @@ WITH confezioni (sku, pz_wp50, pz_wp40, peso_wp50_kg, peso_wp40_kg) AS (
         ('VP08BUST',  12,    6, 2.25, 1.20),
         ('BOXOV',   NULL,    6, NULL, 1.45),   -- 220 g/pezzo, solo WP40
         ('SCAT20V08', NULL,  6, NULL, 1.45)    -- 220 g/pezzo, solo WP40
-        -- scatole regalo/Natale: 6 per WP40 (conf. 5 paste 1,10 kg;
-        -- conf. 10 paste 1,65 kg) — aggiungere gli SKU esatti
+),
+sfusi (sku) AS (
+    -- SKU "sfusi": niente scatola interna WP40/WP50, i pezzi vanno diretti
+    -- nello scatolone (0 posti occupati in questo modello semplificato) —
+    -- stesso trattamento di shipping-api/app/cartonize.py::SFUSO_SKUS.
+    -- Scatole regalo/Natale confermate e pesate dall'utente 12/09/2026
+    -- (100 g le confezioni da 5, 200 g quelle da 10, 180 g Marunetta,
+    -- 150 g Spiritose): prima erano "SKU da confermare", ora censite qui
+    -- come sfuse, non più come non censite.
+    VALUES
+        ('TCAP200SC'),
+        ('SCATR05A'), ('SCATR10A'), ('SCATRN05A'), ('SCATRN10A'),
+        ('SCATM06M'), ('SCATM06SR'), ('SCATM06SA')
 ),
 righe AS (
     SELECT o.id AS order_id, o.order_number, o.requested_delivery_date,
@@ -282,16 +293,19 @@ righe AS (
 calcolo AS (
     SELECT
         rg.*,
-        (c.sku IS NULL) AS non_censito,
-        CASE WHEN c.sku IS NULL OR c.pz_wp50 IS NULL THEN 0
+        (c.sku IS NULL AND s.sku IS NULL) AS non_censito,
+        CASE WHEN s.sku IS NOT NULL THEN 0   -- sfuso: 0 posti, niente WP50/WP40
+             WHEN c.sku IS NULL OR c.pz_wp50 IS NULL THEN 0
              ELSE FLOOR(rg.qta / c.pz_wp50)::int END   AS n_wp50,
-        CASE WHEN c.sku IS NULL THEN 0
+        CASE WHEN s.sku IS NOT NULL THEN 0   -- sfuso: 0 posti, niente WP50/WP40
+             WHEN c.sku IS NULL THEN 0
              ELSE CEIL((rg.qta
                         - CASE WHEN c.pz_wp50 IS NULL THEN 0
                                ELSE FLOOR(rg.qta / c.pz_wp50) * c.pz_wp50 END
                        ) / c.pz_wp40::numeric)::int END AS n_wp40
     FROM righe rg
     LEFT JOIN confezioni c ON c.sku = rg.sku
+    LEFT JOIN sfusi s      ON s.sku = rg.sku
 )
 SELECT
     order_number,
