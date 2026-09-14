@@ -132,16 +132,20 @@ def make_inner_labels_pdf(
         if item.get("componenti"):
             c.setFont("Helvetica-Bold", 14)
             c.drawString(margine, y, f"Collo misto ({item['formato']})")
-            y -= 10 * mm
+            y -= 9 * mm
             for comp in item["componenti"]:
                 nome_comp = (nomi_prodotto or {}).get(comp["sku"])
                 riga = f"{comp['sku']} — {nome_comp}" if nome_comp else comp["sku"]
-                c.setFont("Helvetica-Bold", 16)
-                c.drawString(margine, y, _tronca_a_larghezza(c, riga, "Helvetica-Bold", 16, larghezza_utile))
-                y -= 8 * mm
-                c.setFont("Helvetica-Bold", 22)
+                # font più piccolo + a capo (righe_max=2) invece di troncare
+                # con "…": il nome esatto del prodotto (es. il sapore) è
+                # l'informazione che conta di più su un collo misto.
+                c.setFont("Helvetica-Bold", 13)
+                for sotto_riga in _a_capo(c, riga, "Helvetica-Bold", 13, larghezza_utile, righe_max=2):
+                    c.drawString(margine, y, sotto_riga)
+                    y -= 5.8 * mm
+                c.setFont("Helvetica-Bold", 20)
                 c.drawString(margine + 4 * mm, y, f"{comp['pezzi']} pz")
-                y -= 10 * mm
+                y -= 9 * mm
             c.showPage()
             continue
 
