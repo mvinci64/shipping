@@ -47,6 +47,11 @@ GRAMMATURA_G = {
     # assortite (20 g/pz) — censita 14/09/2026 per il primo collo misto
     # reale, ORD-20260505-4944 (50+50 VP01/VP06 e VP05/VP04 in due WP40).
     "VP01": 20, "VP02": 20, "VP04": 20, "VP05": 20, "VP06": 20,
+    # Stessa Torta Caprese di TCAP200SC, formato da 500g — TCAP500IR
+    # ("confezione con ruoto") confermato dall'utente 14/09/2026 stesso
+    # peso di TCAP500SC (500gr esplicito nel nome prodotto), cambia solo
+    # la confezione (in ruoto invece che scatola).
+    "TCAP500SC": 500, "TCAP500IR": 500,
 }
 
 # SKU "sfusi": niente scatola interna WP40/WP50, i pezzi riempiono
@@ -56,7 +61,7 @@ GRAMMATURA_G = {
 # dall'utente 11/09/2026 per TCAP200SC, esteso alle scatole regalo/Natale
 # il 12/09/2026. Primi ordini reali: ORD-20260908-6587, ORD-20260505-4944.
 SFUSO_SKUS = {
-    "TCAP200SC",
+    "TCAP200SC", "TCAP500SC", "TCAP500IR",
     "SCATR05A", "SCATR10A", "SCATRN05A", "SCATRN10A",
     "SCATM06M", "SCATM06SR", "SCATM06SA",
 }

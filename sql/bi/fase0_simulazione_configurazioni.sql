@@ -278,7 +278,7 @@ sfusi (sku) AS (
     -- 150 g Spiritose): prima erano "SKU da confermare", ora censite qui
     -- come sfuse, non più come non censite.
     VALUES
-        ('TCAP200SC'),
+        ('TCAP200SC'), ('TCAP500SC'), ('TCAP500IR'),
         ('SCATR05A'), ('SCATR10A'), ('SCATRN05A'), ('SCATRN10A'),
         ('SCATM06M'), ('SCATM06SR'), ('SCATM06SA')
 ),
