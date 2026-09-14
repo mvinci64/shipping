@@ -23,13 +23,21 @@ class RichiestaCartonizzazione(BaseModel):
     righe: list[RigaOrdine]
 
 
-class ScatolaInterna(BaseModel):
-    # None per gli SKU sfusi (vedi cartonize.SFUSO_SKUS): niente scatola
-    # interna, i pezzi riempiono lo scatolone direttamente.
-    formato: str | None
+class ComponenteCollo(BaseModel):
     sku: str
     pezzi: int
+
+
+class ScatolaInterna(BaseModel):
+    # formato None per gli SKU sfusi (vedi cartonize.SFUSO_SKUS): niente
+    # scatola interna, i pezzi riempiono lo scatolone direttamente.
+    # sku None + componenti valorizzato per i colli misti (più SKU nella
+    # stessa scatola interna, vedi cartonize.collo_misto_box).
+    formato: str | None
+    sku: str | None
+    pezzi: int
     peso_g: int
+    componenti: list[ComponenteCollo] | None = None
 
 
 class Scatolone(BaseModel):
@@ -81,6 +89,18 @@ def _ordine_reale(order_number: str) -> dict:
     return ordine
 
 
+def _cartonize_ordine_reale(order_number: str, righe: list[dict]) -> dict:
+    """cartonize_order con i colli misti manuali già registrati per
+    l'ordine (sql/colli_misti_manuali.sql) — usarla SEMPRE al posto di
+    cartonize_order() diretta per un ordine reale, altrimenti le quantità
+    dei colli misti vengono contate due volte (auto + manuale) o segnalate
+    come non censite."""
+    try:
+        return cartonize_order(righe, colli_misti=db.fetch_colli_misti_per_cartonize(order_number))
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
 # Formato del codice di conferma: "<order_number>-NN", lo stesso testo
 # "Collo NN/totale" leggibile sull'etichetta scatolone (vedi
 # labels.make_carton_summary_labels_pdf) — NN a 2 cifre, indice 1-based.
@@ -113,7 +133,7 @@ class StatoColli(BaseModel):
 
 def _stato_colli(order_number: str) -> StatoColli:
     ordine = _ordine_reale(order_number)
-    result = cartonize_order(ordine["righe"])
+    result = _cartonize_ordine_reale(order_number, ordine["righe"])
     n_totale = result["n_scatoloni"]
     confermati = sorted(db.fetch_colli_confermati(order_number))
     mancanti = sorted(set(range(1, n_totale + 1)) - set(confermati))
@@ -127,7 +147,7 @@ def _stato_colli(order_number: str) -> StatoColli:
 def cartonizzazione_ordine_reale(order_number: str) -> RisultatoCartonizzazione:
     """Cartonizzazione di un ordine reale, letto da viscotta.orders/order_items."""
     ordine = _ordine_reale(order_number)
-    result = cartonize_order(ordine["righe"])
+    result = _cartonize_ordine_reale(order_number, ordine["righe"])
     return RisultatoCartonizzazione(order_number=order_number, **result)
 
 
@@ -144,8 +164,15 @@ def etichette_colli_ordine_reale(order_number: str, con_lotto: bool = False) -> 
     per chi lo richiede esplicitamente, ma non è più il comportamento di
     default della UI."""
     ordine = _ordine_reale(order_number)
-    result = cartonize_order(ordine["righe"])
-    skus = {item["sku"] for carton in result["scatoloni"] for item in carton["contenuto"]}
+    result = _cartonize_ordine_reale(order_number, ordine["righe"])
+    # item["sku"] è None per i colli misti (più SKU insieme, vedi
+    # cartonize.collo_misto_box): i loro componenti vanno raccolti a parte.
+    skus = {item["sku"] for carton in result["scatoloni"] for item in carton["contenuto"] if item["sku"]}
+    skus |= {
+        comp["sku"]
+        for carton in result["scatoloni"] for item in carton["contenuto"]
+        for comp in item.get("componenti") or []
+    }
     nomi = {sku: nome for sku in skus if (nome := db.fetch_nome_prodotto(sku)) is not None}
     gtins = {sku: gtin for sku in skus if (gtin := db.fetch_gtin(sku)) is not None}
     lotti = {}
@@ -167,13 +194,62 @@ def etichette_scatolone_ordine_reale(order_number: str) -> Response:
     corriere (DHL/BRT), che resta da applicare a parte alla conferma
     spedizione."""
     ordine = _ordine_reale(order_number)
-    result = cartonize_order(ordine["righe"])
+    result = _cartonize_ordine_reale(order_number, ordine["righe"])
     pdf = make_carton_summary_labels_pdf(order_number, ordine["cliente"], ordine.get("data_consegna"), result)
     return Response(
         content=pdf,
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="etichette_scatolone_{order_number}.pdf"'},
     )
+
+
+class RichiestaColloMisto(BaseModel):
+    formato: str  # "WP50" | "WP40"
+    componenti: list[ComponenteCollo]
+
+
+class ColloMisto(BaseModel):
+    id: str
+    order_number: str
+    formato: str
+    contenuto: list[ComponenteCollo]
+
+
+@router.post("/cartonizzazioni/{order_number}/colli-misti", response_model=ColloMisto)
+def aggiungi_collo_misto(order_number: str, richiesta: RichiestaColloMisto) -> ColloMisto:
+    """Registra un collo con più SKU insieme (WP40/WP50), deciso a mano dal
+    reparto quando i prodotti coinvolti non sono censiti singolarmente —
+    vedi cartonize.SFUSO_SKUS/GRAMMATURA_G e sql/colli_misti_manuali.sql.
+    Le quantità dei componenti sono validate contro le righe reali
+    dell'ordine (non possono superare quanto ordinato, sommato agli altri
+    colli misti già registrati) prima di salvare."""
+    if richiesta.formato not in ("WP50", "WP40"):
+        raise HTTPException(status_code=422, detail="formato deve essere 'WP50' o 'WP40'")
+    ordine = _ordine_reale(order_number)
+    esistenti = db.fetch_colli_misti_per_cartonize(order_number) or []
+    nuovo = {"formato": richiesta.formato, "componenti": [c.model_dump() for c in richiesta.componenti]}
+    try:
+        cartonize_order(ordine["righe"], colli_misti=esistenti + [nuovo])
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except KeyError as exc:
+        raise HTTPException(status_code=422, detail=f"Peso non censito per SKU {exc}") from exc
+
+    creato = db.aggiungi_collo_misto(order_number, richiesta.formato, nuovo["componenti"])
+    return ColloMisto(**creato)
+
+
+@router.get("/cartonizzazioni/{order_number}/colli-misti", response_model=list[ColloMisto])
+def elenco_colli_misti(order_number: str) -> list[ColloMisto]:
+    """Colli misti già registrati per un ordine."""
+    return [ColloMisto(order_number=order_number, **cm) for cm in db.fetch_colli_misti(order_number)]
+
+
+@router.delete("/cartonizzazioni/colli-misti/{collo_id}", status_code=204)
+def rimuovi_collo_misto(collo_id: str) -> None:
+    """Annulla un collo misto (errore di battitura, cambio di piano)."""
+    if not db.elimina_collo_misto(collo_id):
+        raise HTTPException(status_code=404, detail=f"Collo misto {collo_id} non trovato")
 
 
 @router.post("/cartonizzazioni/colli/conferma", response_model=StatoColli)

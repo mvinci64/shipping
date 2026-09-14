@@ -43,6 +43,10 @@ GRAMMATURA_G = {
     "SCATR10A": 200, "SCATRN10A": 200,
     "SCATM06M": 180,
     "SCATM06SR": 150, "SCATM06SA": 150,
+    # Pasta di mandorla singola, stesso biscotto delle scatole/buste
+    # assortite (20 g/pz) — censita 14/09/2026 per il primo collo misto
+    # reale, ORD-20260505-4944 (50+50 VP01/VP06 e VP05/VP04 in due WP40).
+    "VP01": 20, "VP02": 20, "VP04": 20, "VP05": 20, "VP06": 20,
 }
 
 # SKU "sfusi": niente scatola interna WP40/WP50, i pezzi riempiono
@@ -133,30 +137,84 @@ def cartonize_line(sku: str, qta: int):
 def pack_cartons(boxes):
     """Scatole interne → scatoloni (first-fit, WP50 prima). Gli SKU sfusi
     (fmt None) non occupano posti: riempiono lo scatolone corrente dopo
-    aver piazzato le scatole interne WP50/WP40."""
+    aver piazzato le scatole interne WP50/WP40. boxes è una lista di
+    4-tuple (fmt, sku, pezzi, peso) o 5-tuple (fmt, sku, pezzi, peso,
+    componenti) per i colli misti (sku è None in quel caso — vedi
+    collo_misto_box)."""
     cartons = []
-    for fmt, sku, pezzi, peso in sorted(boxes, key=lambda b: -POSTI.get(b[0], 0)):
+    for box in sorted(boxes, key=lambda b: -POSTI.get(b[0], 0)):
+        fmt, sku, pezzi, peso = box[:4]
+        componenti = box[4] if len(box) > 4 else None
         posti = POSTI.get(fmt, 0)
         target = next((c for c in cartons if c["posti_usati"] + posti <= POSTI_SCATOLONE), None)
         if target is None:
             target = {"posti_usati": 0, "contenuto": [], "peso_g": TARA_SCATOLONE_G + CARTA_RIEMPIMENTO_G}
             cartons.append(target)
         target["posti_usati"] += posti
-        target["contenuto"].append({"formato": fmt, "sku": sku, "pezzi": pezzi, "peso_g": peso})
+        entry = {"formato": fmt, "sku": sku, "pezzi": pezzi, "peso_g": peso}
+        if componenti:
+            entry["componenti"] = componenti
+        target["contenuto"].append(entry)
         target["peso_g"] += peso
     return cartons
 
 
-def cartonize_order(rows):
-    """Righe di un ordine (dict con sku, qta) → risultato completo."""
+def collo_misto_box(formato: str, componenti: list[dict]) -> tuple:
+    """Costruisce un box 'misto' pronto per pack_cartons: più SKU nella
+    stessa scatola interna, peso somma dei componenti (stessa formula di
+    _peso_collo_g). componenti: [{"sku": ..., "pezzi": ...}, ...]. Ogni sku
+    deve avere un peso noto in GRAMMATURA_G — KeyError esplicito altrimenti
+    (niente peso indovinato per una spedizione DHL reale)."""
+    peso = sum(c["pezzi"] * (GRAMMATURA_G[c["sku"]] + SOVRAPPESO_CONFEZIONE_G) for c in componenti)
+    peso += TARA_COLLO_G[formato]
+    pezzi_totali = sum(c["pezzi"] for c in componenti)
+    return (formato, None, pezzi_totali, peso, componenti)
+
+
+def cartonize_order(rows, colli_misti: list[dict] | None = None):
+    """Righe di un ordine (dict con sku, qta) → risultato completo.
+    colli_misti (opzionale): colli WP40/WP50 con più SKU decisi a mano
+    dall'operatore (vedi sql/colli_misti_manuali.sql), ciascuno
+    {"formato": ..., "componenti": [{"sku": ..., "pezzi": ...}, ...]}. Le
+    quantità già assegnate a un collo misto vengono sottratte dalle righe
+    prima della cartonizzazione automatica, così non finiscono duplicate
+    né segnalate come non censite."""
+    colli_misti = colli_misti or []
+    consumo: dict[str, int] = {}
+    for cm in colli_misti:
+        for comp in cm["componenti"]:
+            consumo[comp["sku"]] = consumo.get(comp["sku"], 0) + comp["pezzi"]
+
+    disponibile: dict[str, int] = {}
+    for r in rows:
+        sku = r["sku"].strip()
+        disponibile[sku] = disponibile.get(sku, 0) + int(float(r["qta"]))
+    for sku, qta_richiesta in consumo.items():
+        if qta_richiesta > disponibile.get(sku, 0):
+            raise ValueError(
+                f"Collo misto: {sku} richiede {qta_richiesta} pezzi ma l'ordine ne ha solo {disponibile.get(sku, 0)}"
+            )
+
     boxes, non_censiti = [], []
+    consumo_rimanente = dict(consumo)
     for r in rows:
         sku, qta = r["sku"].strip(), int(float(r["qta"]))
-        line_boxes = cartonize_line(sku, qta)
+        # se lo stesso sku è su più righe, il prelievo si spalma tra le
+        # righe nell'ordine in cui compaiono, senza sottrarlo più volte
+        prelievo = min(qta, consumo_rimanente.get(sku, 0))
+        consumo_rimanente[sku] = consumo_rimanente.get(sku, 0) - prelievo
+        qta_residua = qta - prelievo
+        if qta_residua <= 0:
+            continue
+        line_boxes = cartonize_line(sku, qta_residua)
         if line_boxes is None:
-            non_censiti.append({"sku": sku, "qta": qta})
+            non_censiti.append({"sku": sku, "qta": qta_residua})
         else:
             boxes += [(fmt, sku, pezzi, peso) for fmt, pezzi, peso in line_boxes]
+
+    for cm in colli_misti:
+        boxes.append(collo_misto_box(cm["formato"], cm["componenti"]))
+
     cartons = pack_cartons(boxes)
     return {
         "scatoloni": cartons,

@@ -125,6 +125,26 @@ def make_inner_labels_pdf(
             y -= 8.5 * mm
         y -= 6.5 * mm if len(righe_cliente) == 1 else 0
 
+        # Collo misto (più SKU nella stessa scatola interna, decisi a mano
+        # dal reparto — vedi cartonize.collo_misto_box): una riga SKU+nome+
+        # quantità per componente invece del blocco a SKU singolo qui sotto.
+        # Niente barcode: non c'è un solo GTIN da rappresentare.
+        if item.get("componenti"):
+            c.setFont("Helvetica-Bold", 14)
+            c.drawString(margine, y, f"Collo misto ({item['formato']})")
+            y -= 10 * mm
+            for comp in item["componenti"]:
+                nome_comp = (nomi_prodotto or {}).get(comp["sku"])
+                riga = f"{comp['sku']} — {nome_comp}" if nome_comp else comp["sku"]
+                c.setFont("Helvetica-Bold", 16)
+                c.drawString(margine, y, _tronca_a_larghezza(c, riga, "Helvetica-Bold", 16, larghezza_utile))
+                y -= 8 * mm
+                c.setFont("Helvetica-Bold", 22)
+                c.drawString(margine + 4 * mm, y, f"{comp['pezzi']} pz")
+                y -= 10 * mm
+            c.showPage()
+            continue
+
         # SKU normale, formato (WP50/WP40) piccolo — omesso per gli SKU
         # sfusi (formato None): niente scatola interna, i pezzi riempiono
         # lo scatolone direttamente, l'etichetta mostra solo la quantità.
@@ -227,8 +247,15 @@ def make_carton_summary_labels_pdf(
         for item in carton["contenuto"]:
             # SKU sfusi (formato None): niente scatola interna, riempiono
             # lo scatolone direttamente — nessun "1× WPxx" da mostrare.
-            descrizione = f"1× {item['formato']}  {item['sku']}  ({item['pezzi']} pz)" if item["formato"] \
-                else f"{item['sku']}  ({item['pezzi']} pz, sfuso)"
+            # Colli misti (sku None, formato valorizzato): più SKU nella
+            # stessa scatola interna — vedi cartonize.collo_misto_box.
+            if item.get("componenti"):
+                contenuto_misto = " + ".join(f"{comp['pezzi']}× {comp['sku']}" for comp in item["componenti"])
+                descrizione = f"1× {item['formato']}  {contenuto_misto}"
+            elif item["formato"]:
+                descrizione = f"1× {item['formato']}  {item['sku']}  ({item['pezzi']} pz)"
+            else:
+                descrizione = f"{item['sku']}  ({item['pezzi']} pz, sfuso)"
             c.drawString(margine + 2 * mm, y, descrizione)
             c.drawRightString(W - margine, y, f"{item['peso_g'] / 1000:.2f} kg")
             y -= 5 * mm

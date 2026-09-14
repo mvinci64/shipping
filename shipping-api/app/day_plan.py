@@ -7,6 +7,7 @@ fatta (vedi app/labels.py, Fase 2).
 """
 import io
 
+from app import db
 from app.cartonize import cartonize_order
 
 PAGE_W_MM = 210
@@ -20,7 +21,7 @@ def _draw_quadrant(c, x0, y0, w, h, mm, ordine: dict):
     """Disegna il piano di un ordine dentro il rettangolo (x0,y0,w,h) — origine
     in basso a sinistra del quadrante. Interrompe il disegno (con '…') se il
     contenuto non entra, invece di scrivere fuori dal quadrante."""
-    result = cartonize_order(ordine["righe"])
+    result = cartonize_order(ordine["righe"], colli_misti=db.fetch_colli_misti_per_cartonize(ordine["order_number"]))
     y_top = y0 + h - MARGIN_MM * mm
     y_bottom = y0 + (MARGIN_MM + FOOTER_H_MM) * mm
     x = x0 + MARGIN_MM * mm
@@ -56,7 +57,11 @@ def _draw_quadrant(c, x0, y0, w, h, mm, ordine: dict):
         for item in carton["contenuto"]:
             if not riga_disponibile(3.5):
                 break
-            c.drawString(x + 2 * mm, y, f"{item['sku']} ({item['formato']}) — {item['pezzi']} pz")
+            if item["sku"] is None:  # collo misto — vedi cartonize.collo_misto_box
+                descrizione = " + ".join(f"{comp['pezzi']}× {comp['sku']}" for comp in item["componenti"])
+            else:
+                descrizione = f"{item['sku']} ({item['formato']}) — {item['pezzi']} pz"
+            c.drawString(x + 2 * mm, y, descrizione)
             y -= 3.5 * mm
 
     if result["non_censiti"]:

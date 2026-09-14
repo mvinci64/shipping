@@ -206,6 +206,131 @@
         }
       }
     },
+    "/cartonizzazioni/{order_number}/colli-misti": {
+      "post": {
+        "summary": "Aggiungi Collo Misto",
+        "description": "Registra un collo con più SKU insieme (WP40/WP50), deciso a mano dal\nreparto quando i prodotti coinvolti non sono censiti singolarmente —\nvedi cartonize.SFUSO_SKUS/GRAMMATURA_G e sql/colli_misti_manuali.sql.\nLe quantità dei componenti sono validate contro le righe reali\ndell'ordine (non possono superare quanto ordinato, sommato agli altri\ncolli misti già registrati) prima di salvare.",
+        "operationId": "aggiungi_collo_misto_cartonizzazioni__order_number__colli_misti_post",
+        "parameters": [
+          {
+            "name": "order_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Order Number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RichiestaColloMisto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ColloMisto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "Elenco Colli Misti",
+        "description": "Colli misti già registrati per un ordine.",
+        "operationId": "elenco_colli_misti_cartonizzazioni__order_number__colli_misti_get",
+        "parameters": [
+          {
+            "name": "order_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Order Number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ColloMisto"
+                  },
+                  "title": "Response Elenco Colli Misti Cartonizzazioni  Order Number  Colli Misti Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cartonizzazioni/colli-misti/{collo_id}": {
+      "delete": {
+        "summary": "Rimuovi Collo Misto",
+        "description": "Annulla un collo misto (errore di battitura, cambio di piano).",
+        "operationId": "rimuovi_collo_misto_cartonizzazioni_colli_misti__collo_id__delete",
+        "parameters": [
+          {
+            "name": "collo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Collo Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/cartonizzazioni/colli/conferma": {
       "post": {
         "summary": "Conferma Collo Scansionato",
@@ -946,6 +1071,55 @@
   },
   "components": {
     "schemas": {
+      "ColloMisto": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "order_number": {
+            "type": "string",
+            "title": "Order Number"
+          },
+          "formato": {
+            "type": "string",
+            "title": "Formato"
+          },
+          "contenuto": {
+            "items": {
+              "$ref": "#/components/schemas/ComponenteCollo"
+            },
+            "type": "array",
+            "title": "Contenuto"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "order_number",
+          "formato",
+          "contenuto"
+        ],
+        "title": "ColloMisto"
+      },
+      "ComponenteCollo": {
+        "properties": {
+          "sku": {
+            "type": "string",
+            "title": "Sku"
+          },
+          "pezzi": {
+            "type": "integer",
+            "title": "Pezzi"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sku",
+          "pezzi"
+        ],
+        "title": "ComponenteCollo"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1055,6 +1229,27 @@
           "righe"
         ],
         "title": "RichiestaCartonizzazione"
+      },
+      "RichiestaColloMisto": {
+        "properties": {
+          "formato": {
+            "type": "string",
+            "title": "Formato"
+          },
+          "componenti": {
+            "items": {
+              "$ref": "#/components/schemas/ComponenteCollo"
+            },
+            "type": "array",
+            "title": "Componenti"
+          }
+        },
+        "type": "object",
+        "required": [
+          "formato",
+          "componenti"
+        ],
+        "title": "RichiestaColloMisto"
       },
       "RichiestaPickupMultiplo": {
         "properties": {
@@ -1235,7 +1430,14 @@
             "title": "Formato"
           },
           "sku": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Sku"
           },
           "pezzi": {
@@ -1245,6 +1447,20 @@
           "peso_g": {
             "type": "integer",
             "title": "Peso G"
+          },
+          "componenti": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ComponenteCollo"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Componenti"
           }
         },
         "type": "object",

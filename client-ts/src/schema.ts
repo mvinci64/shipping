@@ -116,6 +116,55 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/cartonizzazioni/{order_number}/colli-misti": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Elenco Colli Misti
+         * @description Colli misti già registrati per un ordine.
+         */
+        get: operations["elenco_colli_misti_cartonizzazioni__order_number__colli_misti_get"];
+        put?: never;
+        /**
+         * Aggiungi Collo Misto
+         * @description Registra un collo con più SKU insieme (WP40/WP50), deciso a mano dal
+         *     reparto quando i prodotti coinvolti non sono censiti singolarmente —
+         *     vedi cartonize.SFUSO_SKUS/GRAMMATURA_G e sql/colli_misti_manuali.sql.
+         *     Le quantità dei componenti sono validate contro le righe reali
+         *     dell'ordine (non possono superare quanto ordinato, sommato agli altri
+         *     colli misti già registrati) prima di salvare.
+         */
+        post: operations["aggiungi_collo_misto_cartonizzazioni__order_number__colli_misti_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cartonizzazioni/colli-misti/{collo_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Rimuovi Collo Misto
+         * @description Annulla un collo misto (errore di battitura, cambio di piano).
+         */
+        delete: operations["rimuovi_collo_misto_cartonizzazioni_colli_misti__collo_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/cartonizzazioni/colli/conferma": {
         parameters: {
             query?: never;
@@ -488,6 +537,24 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** ColloMisto */
+        ColloMisto: {
+            /** Id */
+            id: string;
+            /** Order Number */
+            order_number: string;
+            /** Formato */
+            formato: string;
+            /** Contenuto */
+            contenuto: components["schemas"]["ComponenteCollo"][];
+        };
+        /** ComponenteCollo */
+        ComponenteCollo: {
+            /** Sku */
+            sku: string;
+            /** Pezzi */
+            pezzi: number;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -531,6 +598,13 @@ export interface components {
             cliente: string;
             /** Righe */
             righe: components["schemas"]["RigaOrdine"][];
+        };
+        /** RichiestaColloMisto */
+        RichiestaColloMisto: {
+            /** Formato */
+            formato: string;
+            /** Componenti */
+            componenti: components["schemas"]["ComponenteCollo"][];
         };
         /** RichiestaPickupMultiplo */
         RichiestaPickupMultiplo: {
@@ -590,11 +664,13 @@ export interface components {
             /** Formato */
             formato: string | null;
             /** Sku */
-            sku: string;
+            sku: string | null;
             /** Pezzi */
             pezzi: number;
             /** Peso G */
             peso_g: number;
+            /** Componenti */
+            componenti?: components["schemas"]["ComponenteCollo"][] | null;
         };
         /** Scatolone */
         Scatolone: {
@@ -836,6 +912,101 @@ export interface operations {
                 content: {
                     "application/json": unknown;
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    elenco_colli_misti_cartonizzazioni__order_number__colli_misti_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_number: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ColloMisto"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    aggiungi_collo_misto_cartonizzazioni__order_number__colli_misti_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_number: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RichiestaColloMisto"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ColloMisto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rimuovi_collo_misto_cartonizzazioni_colli_misti__collo_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                collo_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
