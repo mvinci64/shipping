@@ -273,6 +273,15 @@ def crea_spedizione(
     return response.json()
 
 
+def _shipment_detail(shipment_tracking_number: str, product_code: str, pesi_scatoloni_kg: list[float]) -> dict:
+    return {
+        "shipmentTrackingNumber": shipment_tracking_number,
+        "productCode": product_code,
+        "unitOfMeasurement": "metric",
+        "packages": [_package(peso) for peso in pesi_scatoloni_kg],
+    }
+
+
 def richiedi_pickup(
     *,
     shipment_tracking_number: str,
@@ -282,10 +291,38 @@ def richiedi_pickup(
     ora_inizio: str = "13:00",
     ora_fine: str = "17:00",
 ) -> dict:
-    """Chiama POST /pickups — prenota il ritiro per una spedizione già
-    creata (shipment_tracking_number da crea_spedizione). HA EFFETTO REALE
-    come crea_spedizione: stessa cautela, non esposta come endpoint finché
-    non c'è la FSM bozza→confermata."""
+    """Chiama POST /pickups — prenota il ritiro per UNA spedizione già
+    creata (shipment_tracking_number da crea_spedizione). Per più
+    spedizioni nello stesso ritiro (un solo passaggio del corriere) vedi
+    richiedi_pickup_multiplo. HA EFFETTO REALE come crea_spedizione: stessa
+    cautela."""
+    return richiedi_pickup_multiplo(
+        spedizioni=[{
+            "shipment_tracking_number": shipment_tracking_number,
+            "product_code": product_code,
+            "pesi_scatoloni_kg": pesi_scatoloni_kg,
+        }],
+        data_pickup_iso=data_pickup_iso,
+        ora_inizio=ora_inizio,
+        ora_fine=ora_fine,
+    )
+
+
+def richiedi_pickup_multiplo(
+    *,
+    spedizioni: list[dict],
+    data_pickup_iso: str,
+    ora_inizio: str = "13:00",
+    ora_fine: str = "17:00",
+) -> dict:
+    """Chiama POST /pickups con PIÙ spedizioni nello stesso shipmentDetails
+    — un solo passaggio del corriere per tutte insieme, un solo
+    dispatchConfirmationNumber (PRG) in risposta, che va registrato su
+    tutte le spedizioni coinvolte (vedi db.registra_pickup_multiplo).
+    Ogni elemento di `spedizioni` è un dict con shipment_tracking_number,
+    product_code, pesi_scatoloni_kg (le stesse chiavi di richiedi_pickup).
+    HA EFFETTO REALE: stessa cautela di richiedi_pickup — non richiamare
+    mai per prova, solo per spedizioni vere da ritirare sul serio."""
     account, username, password = _credentials()
     if not (ORIGIN_POSTAL_CODE and ORIGIN_CITY and ORIGIN_ADDRESS_LINE):
         raise DHLConfigError(
@@ -305,12 +342,8 @@ def richiedi_pickup(
         "locationType": "business",
         "accounts": [{"typeCode": "shipper", "number": account}],
         "shipmentDetails": [
-            {
-                "shipmentTrackingNumber": shipment_tracking_number,
-                "productCode": product_code,
-                "unitOfMeasurement": "metric",
-                "packages": [_package(peso) for peso in pesi_scatoloni_kg],
-            }
+            _shipment_detail(s["shipment_tracking_number"], s["product_code"], s["pesi_scatoloni_kg"])
+            for s in spedizioni
         ],
         "customerDetails": {
             "shipperDetails": {

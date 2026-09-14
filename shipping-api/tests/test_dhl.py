@@ -113,6 +113,71 @@ def test_richiedi_pickup_senza_contatto_mittente_solleva_config_error(monkeypatc
         dhl.richiedi_pickup(**_kwargs_richiedi_pickup())
 
 
+def test_richiedi_pickup_multiplo_un_solo_shipmentdetails_per_spedizione(monkeypatch):
+    monkeypatch.setenv("DHL_ACCOUNT_NUMBER", "127990547")
+    monkeypatch.setenv("DHL_API_USERNAME", "user")
+    monkeypatch.setenv("DHL_API_PASSWORD", "pass")
+
+    payload_inviato = {}
+
+    class RispostaFinta:
+        status_code = 200
+
+        def json(self):
+            return {"dispatchConfirmationNumbers": ["PRG260914012345"]}
+
+    def post_finto(url, json, auth, timeout):
+        payload_inviato.update(json)
+        return RispostaFinta()
+
+    monkeypatch.setattr(dhl.requests, "post", post_finto)
+
+    risposta = dhl.richiedi_pickup_multiplo(
+        spedizioni=[
+            {"shipment_tracking_number": "1111111111", "product_code": "N", "pesi_scatoloni_kg": [3.2]},
+            {"shipment_tracking_number": "2222222222", "product_code": "N", "pesi_scatoloni_kg": [1.5, 2.0]},
+        ],
+        data_pickup_iso="2026-09-15",
+    )
+
+    assert risposta["dispatchConfirmationNumbers"] == ["PRG260914012345"]
+    assert [d["shipmentTrackingNumber"] for d in payload_inviato["shipmentDetails"]] == ["1111111111", "2222222222"]
+    assert len(payload_inviato["shipmentDetails"][1]["packages"]) == 2
+
+
+def test_richiedi_pickup_singolo_e_multiplo_con_una_spedizione_producono_stesso_payload(monkeypatch):
+    monkeypatch.setenv("DHL_ACCOUNT_NUMBER", "127990547")
+    monkeypatch.setenv("DHL_API_USERNAME", "user")
+    monkeypatch.setenv("DHL_API_PASSWORD", "pass")
+
+    payloads = []
+
+    class RispostaFinta:
+        status_code = 200
+
+        def json(self):
+            return {"dispatchConfirmationNumbers": ["PRG260914012345"]}
+
+    def post_finto(url, json, auth, timeout):
+        payloads.append(json)
+        return RispostaFinta()
+
+    monkeypatch.setattr(dhl.requests, "post", post_finto)
+
+    kwargs = _kwargs_richiedi_pickup()
+    dhl.richiedi_pickup(**kwargs)
+    dhl.richiedi_pickup_multiplo(
+        spedizioni=[{
+            "shipment_tracking_number": kwargs["shipment_tracking_number"],
+            "product_code": kwargs["product_code"],
+            "pesi_scatoloni_kg": kwargs["pesi_scatoloni_kg"],
+        }],
+        data_pickup_iso=kwargs["data_pickup_iso"],
+    )
+
+    assert payloads[0] == payloads[1]
+
+
 def test_crea_spedizione_contrassegno_metodo_invalido_solleva_config_error(monkeypatch):
     monkeypatch.setenv("DHL_ACCOUNT_NUMBER", "127990547")
     monkeypatch.setenv("DHL_API_USERNAME", "user")

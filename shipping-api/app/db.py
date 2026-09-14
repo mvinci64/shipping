@@ -250,6 +250,25 @@ def registra_pickup_spedizione(spedizione_id: str, *, dispatch_confirmation_numb
     return _spedizione_da_riga(row)
 
 
+def registra_pickup_multiplo(spedizione_ids: list[str], *, dispatch_confirmation_number: str) -> list[dict]:
+    """Come registra_pickup_spedizione ma per più spedizioni con lo STESSO
+    dispatch_confirmation_number (un solo ritiro DHL per tutte — vedi
+    dhl.richiedi_pickup_multiplo). Chiamare SOLO dopo che la richiesta a
+    DHL ha già avuto successo per l'intero gruppo."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            f"""
+            UPDATE viscotta.spedizioni
+            SET stato = 'ritirata', dispatch_confirmation_number = %s, ritirata_at = now()
+            WHERE id = ANY(%s) AND stato = 'confermata'
+            RETURNING {_COLONNE_SPEDIZIONE}
+            """,
+            (dispatch_confirmation_number, spedizione_ids),
+        ).fetchall()
+        conn.commit()
+    return [_spedizione_da_riga(row) for row in rows]
+
+
 def segna_spedizione_fallita(spedizione_id: str, *, errore: str) -> None:
     """La bozza resta consultabile (stato 'fallita', non cancellata) —
     l'operatore capisce cos'è andato storto senza dover rifare tutto da

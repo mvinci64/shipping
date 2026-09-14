@@ -332,6 +332,56 @@ def richiedi_pickup_spedizione(spedizione_id: str, data_pickup: datetime.date | 
     return SpedizioneResponse(**aggiornata)
 
 
+class RichiestaPickupMultiplo(BaseModel):
+    spedizione_ids: list[str]
+    data_pickup: datetime.date | None = None
+
+
+@router.post("/spedizioni/pickup-multiplo", response_model=list[SpedizioneResponse])
+def richiedi_pickup_multiplo(body: RichiestaPickupMultiplo) -> list[SpedizioneResponse]:
+    """Come /spedizioni/{id}/pickup ma per PIÙ spedizioni insieme, con UN
+    SOLO ritiro DHL (un solo passaggio del corriere, un solo PRG) invece di
+    uno per spedizione — usarlo quando più ordini vanno ritirati lo stesso
+    giorno. QUESTA CHIAMATA HA EFFETTO REALE: prenota il ritiro DHL vero
+    per tutte le spedizioni elencate in un'unica chiamata."""
+    if not body.spedizione_ids:
+        raise HTTPException(status_code=422, detail="spedizione_ids non può essere vuoto")
+
+    spedizioni = []
+    for spedizione_id in body.spedizione_ids:
+        spedizione = db.fetch_spedizione(spedizione_id)
+        if spedizione is None:
+            raise HTTPException(status_code=404, detail=f"Spedizione {spedizione_id} non trovata")
+        if spedizione["stato"] != "confermata":
+            raise HTTPException(
+                status_code=409,
+                detail=f"Spedizione {spedizione_id} in stato '{spedizione['stato']}', non 'confermata'",
+            )
+        spedizioni.append(spedizione)
+
+    data_iso = (body.data_pickup or (datetime.date.today() + datetime.timedelta(days=1))).isoformat()
+    try:
+        risposta = dhl.richiedi_pickup_multiplo(
+            spedizioni=[
+                {
+                    "shipment_tracking_number": s["shipment_tracking_number"],
+                    "product_code": s["product_code"],
+                    "pesi_scatoloni_kg": s["pesi_scatoloni_kg"],
+                }
+                for s in spedizioni
+            ],
+            data_pickup_iso=data_iso,
+        )
+    except (dhl.DHLConfigError, dhl.DHLAPIError) as exc:
+        status = 502 if isinstance(exc, dhl.DHLAPIError) else 500
+        raise HTTPException(status_code=status, detail=str(exc)) from exc
+
+    aggiornate = db.registra_pickup_multiplo(
+        body.spedizione_ids, dispatch_confirmation_number=risposta["dispatchConfirmationNumbers"][0],
+    )
+    return [SpedizioneResponse(**a) for a in aggiornate]
+
+
 @router.delete("/spedizioni/{spedizione_id}", status_code=204)
 def elimina_bozza_spedizione(spedizione_id: str) -> None:
     """Cancella SOLO se ancora in stato 'bozza' — nessuna chiamata DHL con

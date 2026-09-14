@@ -777,6 +777,49 @@
         }
       }
     },
+    "/spedizioni/pickup-multiplo": {
+      "post": {
+        "summary": "Richiedi Pickup Multiplo",
+        "description": "Come /spedizioni/{id}/pickup ma per PIÙ spedizioni insieme, con UN\nSOLO ritiro DHL (un solo passaggio del corriere, un solo PRG) invece di\nuno per spedizione — usarlo quando più ordini vanno ritirati lo stesso\ngiorno. QUESTA CHIAMATA HA EFFETTO REALE: prenota il ritiro DHL vero\nper tutte le spedizioni elencate in un'unica chiamata.",
+        "operationId": "richiedi_pickup_multiplo_spedizioni_pickup_multiplo_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RichiestaPickupMultiplo"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SpedizioneResponse"
+                  },
+                  "type": "array",
+                  "title": "Response Richiedi Pickup Multiplo Spedizioni Pickup Multiplo Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/auth/login": {
       "post": {
         "tags": [
@@ -1012,6 +1055,34 @@
           "righe"
         ],
         "title": "RichiestaCartonizzazione"
+      },
+      "RichiestaPickupMultiplo": {
+        "properties": {
+          "spedizione_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Spedizione Ids"
+          },
+          "data_pickup": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Pickup"
+          }
+        },
+        "type": "object",
+        "required": [
+          "spedizione_ids"
+        ],
+        "title": "RichiestaPickupMultiplo"
       },
       "RigaElenco": {
         "properties": {

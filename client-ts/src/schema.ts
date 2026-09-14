@@ -392,6 +392,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/spedizioni/pickup-multiplo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Richiedi Pickup Multiplo
+         * @description Come /spedizioni/{id}/pickup ma per PIÙ spedizioni insieme, con UN
+         *     SOLO ritiro DHL (un solo passaggio del corriere, un solo PRG) invece di
+         *     uno per spedizione — usarlo quando più ordini vanno ritirati lo stesso
+         *     giorno. QUESTA CHIAMATA HA EFFETTO REALE: prenota il ritiro DHL vero
+         *     per tutte le spedizioni elencate in un'unica chiamata.
+         */
+        post: operations["richiedi_pickup_multiplo_spedizioni_pickup_multiplo_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/login": {
         parameters: {
             query?: never;
@@ -507,6 +531,13 @@ export interface components {
             cliente: string;
             /** Righe */
             righe: components["schemas"]["RigaOrdine"][];
+        };
+        /** RichiestaPickupMultiplo */
+        RichiestaPickupMultiplo: {
+            /** Spedizione Ids */
+            spedizione_ids: string[];
+            /** Data Pickup */
+            data_pickup?: string | null;
         };
         /** RigaElenco */
         RigaElenco: {
@@ -1213,6 +1244,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SpedizioneResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    richiedi_pickup_multiplo_spedizioni_pickup_multiplo_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RichiestaPickupMultiplo"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpedizioneResponse"][];
                 };
             };
             /** @description Validation Error */
