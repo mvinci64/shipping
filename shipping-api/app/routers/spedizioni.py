@@ -60,6 +60,37 @@ def _cap_destinatario(destinatario: dict) -> str:
     return destinatario.get("cap") or _estrai_cap(destinatario["indirizzo"])
 
 
+# Prefissi di via noti, per tagliare via il nome azienda quando precede la
+# via nel formato "NOME VIA STRADA N CAP CITTÀ (PROV)" (vedi commento sopra
+# CAP_RE). Elenco minimo, esteso quando emerge un caso reale non coperto.
+_PREFISSI_VIA = (
+    "via", "viale", "v.le", "corso", "c.so", "piazza", "p.zza", "p.za",
+    "vicolo", "largo", "strada", "s.da", "c.da", "contrada", "località",
+    "localita", "loc.", "frazione", "fraz.", "lungomare", "lungarno",
+)
+
+
+def _indirizzo_spedizione(indirizzo: str) -> str:
+    """Solo la via, ripulita da CAP/città/provincia ed eventuale nome
+    azienda in testa — MyDHL API vuole addressLine1 lungo al massimo 45
+    caratteri, ma customers.shipping_address è testo libero con tutto
+    insieme (es. "STELMOKA VIA VITTORIO EMANUELE II 11/13 20842 BESANA IN
+    BRIANZA (MB)", 68 caratteri: 422 "expected maxLength: 45, actual: 68"
+    da DHL su IMPORT-DMLAB-20260629-01, 15/09/2026). Troncamento finale a
+    45 come rete di sicurezza, anche se l'estrazione qui sopra fallisse."""
+    grezzo = (indirizzo or "").strip()
+    match = CAP_RE.search(grezzo)
+    prima_del_cap = (grezzo[: match.start()] if match else grezzo).strip(" ,")
+
+    parole = prima_del_cap.split()
+    for i, parola in enumerate(parole):
+        if parola.strip(".").lower() in _PREFISSI_VIA:
+            prima_del_cap = " ".join(parole[i:])
+            break
+
+    return (prima_del_cap or grezzo)[:45].strip()
+
+
 def _iso2(paese: str) -> str:
     paese_pulito = (paese or "").strip()
     if len(paese_pulito) == 2 and paese_pulito.isalpha():
@@ -231,12 +262,19 @@ def conferma_spedizione(spedizione_id: str) -> SpedizioneResponse:
     Gate: rifiuta (409) se il reparto non ha ancora scansionato tutti i
     colli dell'ordine (vedi POST /cartonizzazioni/colli/conferma) — senza
     questo controllo si potrebbe confermare (costo reale, ritiro reale)
-    una spedizione con uno scatolone ancora aperto sul tavolo."""
+    una spedizione con uno scatolone ancora aperto sul tavolo.
+
+    Accetta anche stato 'fallita' (non solo 'bozza'): un tentativo
+    precedente può fallire per un motivo nel frattempo corretto (es. dati
+    destinatario) senza che sia mai stata creata una spedizione DHL reale
+    — vedi db.segna_spedizione_fallita, non ha effetto lato DHL."""
     spedizione = db.fetch_spedizione(spedizione_id)
     if spedizione is None:
         raise HTTPException(status_code=404, detail=f"Spedizione {spedizione_id} non trovata")
-    if spedizione["stato"] != "bozza":
-        raise HTTPException(status_code=409, detail=f"Spedizione in stato '{spedizione['stato']}', non 'bozza'")
+    if spedizione["stato"] not in ("bozza", "fallita"):
+        raise HTTPException(
+            status_code=409, detail=f"Spedizione in stato '{spedizione['stato']}', non 'bozza'/'fallita'"
+        )
 
     stato_colli = _stato_colli(spedizione["order_number"])
     if not stato_colli.completo:
@@ -257,7 +295,7 @@ def conferma_spedizione(spedizione_id: str) -> SpedizioneResponse:
             destinatario_nome=destinatario["nome"] or ordine["cliente"],
             destinatario_email=destinatario["email"] or "",
             destinatario_telefono=destinatario["telefono"] or "",
-            destinatario_indirizzo=destinatario["indirizzo"],
+            destinatario_indirizzo=_indirizzo_spedizione(destinatario["indirizzo"]),
             destinatario_cap=_cap_destinatario(destinatario),
             destinatario_citta=destinatario["citta"],
             destinatario_provincia=destinatario["provincia"] or "",

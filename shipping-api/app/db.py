@@ -213,22 +213,24 @@ def fetch_spedizione(spedizione_id: str) -> dict | None:
 def conferma_spedizione(
     spedizione_id: str, *, shipment_tracking_number: str, tracking_url: str, etichetta_pdf: bytes,
 ) -> dict:
-    """bozza -> confermata. Chiamare SOLO dopo che dhl.crea_spedizione ha
-    già avuto successo (ha effetto reale, non è idempotente)."""
+    """bozza/fallita -> confermata. Chiamare SOLO dopo che dhl.crea_spedizione
+    ha già avuto successo (ha effetto reale, non è idempotente). Accetta
+    anche 'fallita' per permettere il retry di un tentativo precedente non
+    andato a buon fine (vedi routers/spedizioni.py conferma_spedizione)."""
     with get_connection() as conn:
         row = conn.execute(
             f"""
             UPDATE viscotta.spedizioni
             SET stato = 'confermata', shipment_tracking_number = %s,
-                tracking_url = %s, etichetta_pdf = %s, confermata_at = now()
-            WHERE id = %s AND stato = 'bozza'
+                tracking_url = %s, etichetta_pdf = %s, confermata_at = now(), errore = NULL
+            WHERE id = %s AND stato IN ('bozza', 'fallita')
             RETURNING {_COLONNE_SPEDIZIONE}
             """,
             (shipment_tracking_number, tracking_url, etichetta_pdf, spedizione_id),
         ).fetchone()
         conn.commit()
     if row is None:
-        raise ValueError(f"Spedizione {spedizione_id} non trovata o non in stato 'bozza'")
+        raise ValueError(f"Spedizione {spedizione_id} non trovata o non in stato 'bozza'/'fallita'")
     return _spedizione_da_riga(row)
 
 
