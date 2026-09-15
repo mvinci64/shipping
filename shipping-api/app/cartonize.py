@@ -98,7 +98,10 @@ PEZZI_PER_COLLO = {
     "VP08BUST":  {"WP50": 12, "WP40": 6},
     "BOXOV":     {"WP40": 6},
     "SCAT20V08": {"WP40": 6},
-    "MSAL1KG":   {"WP50": 2, "WP40": 1},
+    # MSAL1KG: configurazione ideale precisata dall'utente 15/09/2026 —
+    # solo WP40 (niente WP50), 2 unità da 1kg (= 4 buste da 500g, ~2kg) a
+    # collo, capacità propria diversa dagli altri tre formati da 1kg.
+    "MSAL1KG":   {"WP40": 2},
     "CHMS1KG":   {"WP50": 2, "WP40": 1},
     "CANTS1KG":  {"WP50": 2, "WP40": 1},
     "GRM1KG":    {"WP50": 2, "WP40": 1},
