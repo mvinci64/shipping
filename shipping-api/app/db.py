@@ -67,16 +67,20 @@ def fetch_destinatario(order_number: str) -> dict | None:
     il CAP per 67 clienti su 71 con ordini in prenotazione, contro i 27
     di prima che dipendevano dal parsing di shipping_address): se vuota,
     resta a carico del chiamante estrarla da shipping_address (vedi
-    _estrai_cap in routers/spedizioni.py). email/telefono servono solo per
+    _estrai_cap in routers/spedizioni.py). Se shipping_address è NULL/vuoto
+    (mai censito sul Portal — caso reale ORD-20260806-9402, 15/09/2026:
+    DHL rifiuta con 422 "addressLine1 expected minLength: 1, actual: 0"),
+    fallback su easyfatt.tanagrafica.indirizzo, stessa chiave codanagr =
+    customers.code del fallback telefono. email/telefono servono solo per
     dhl.crea_spedizione (non per /rates); se customers.phone è vuoto si fa
-    fallback su easyfatt.tanagrafica (tel poi cell), agganciata via
-    codanagr = customers.code — chiave pulita, senza duplicati su
-    codanagr. Molti clienti restano comunque senza telefono in nessuna
-    delle due fonti — vedi note in routers/spedizioni.py."""
+    fallback su easyfatt.tanagrafica (tel poi cell). Molti clienti restano
+    comunque senza telefono/indirizzo in nessuna delle due fonti — vedi
+    note in routers/spedizioni.py."""
     with get_connection() as conn:
         row = conn.execute(
             """
-            SELECT c.company_name, c.shipping_address, c.city, c.province,
+            SELECT c.company_name, COALESCE(NULLIF(c.shipping_address, ''), a.indirizzo) AS shipping_address,
+                   c.city, c.province,
                    c.country, c.email, c.cap,
                    COALESCE(NULLIF(c.phone, ''), a.tel, a.cell) AS telefono
             FROM viscotta.orders o

@@ -288,6 +288,15 @@ def conferma_spedizione(spedizione_id: str) -> SpedizioneResponse:
         )
 
     ordine, destinatario = _ordine_e_destinatario(spedizione["order_number"])
+    if not _indirizzo_spedizione(destinatario["indirizzo"]):
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Indirizzo mancante per il cliente dell'ordine {spedizione['order_number']} "
+                "(né viscotta.customers.shipping_address né easyfatt.tanagrafica.indirizzo) — "
+                "va aggiunto a mano prima di poter confermare"
+            ),
+        )
     try:
         risposta = dhl.crea_spedizione(
             order_number=spedizione["order_number"],
