@@ -9,10 +9,19 @@ export default async function DettaglioSpedizione({
   params, searchParams,
 }: {
   params: Promise<{ order_number: string }>;
-  searchParams: Promise<{ cliente?: string }>;
+  searchParams: Promise<{ cliente?: string; data_da?: string; data_a?: string }>;
 }) {
   const { order_number } = await params;
-  const { cliente } = await searchParams;
+  const { cliente, data_da, data_a } = await searchParams;
+
+  // Il filtro data della lista arriva qui via query string (vedi
+  // TabellaSpedizioni) e va rimesso nel link di ritorno, altrimenti
+  // "← Ordini da spedire" riporta sempre alla finestra di default invece
+  // che a quella su cui si stava lavorando (bug segnalato 16/09/2026).
+  const queryLista = new URLSearchParams();
+  if (data_da) queryLista.set("data_da", data_da);
+  if (data_a) queryLista.set("data_a", data_a);
+  const hrefLista = queryLista.size > 0 ? `/spedizioni?${queryLista.toString()}` : "/spedizioni";
 
   const [cartonizzazione, colli, spedizione] = await Promise.all([
     shippingClient.GET("/cartonizzazioni/{order_number}", { params: { path: { order_number } } }),
@@ -42,7 +51,7 @@ export default async function DettaglioSpedizione({
     <div className="flex flex-1 flex-col items-center bg-zinc-50 font-sans dark:bg-black">
       <main className="flex w-full max-w-2xl flex-1 flex-col gap-6 px-8 py-16">
         <div>
-          <Link href="/spedizioni" className="text-xs text-zinc-500 hover:underline dark:text-zinc-400">
+          <Link href={hrefLista} className="text-xs text-zinc-500 hover:underline dark:text-zinc-400">
             ← Ordini da spedire
           </Link>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight text-black dark:text-zinc-50">

@@ -28,7 +28,9 @@ function formattaData(iso: string | null): string {
   return new Date(iso + "T00:00:00").toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" });
 }
 
-export function TabellaSpedizioni({ righe }: { righe: Riga[] }) {
+type Props = { righe: Riga[]; dataDa?: string; dataA?: string };
+
+export function TabellaSpedizioni({ righe, dataDa, dataA }: Props) {
   const [selezionate, setSelezionate] = useState<Set<string>>(new Set());
   const [stato, formAction, inCorso] = useActionState(richiediPickupMultiploAction, { errore: null, successo: null });
   const [digitato, setDigitato] = useState("");
@@ -107,7 +109,14 @@ export function TabellaSpedizioni({ righe }: { righe: Riga[] }) {
           <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
             {righe.map((riga) => {
               const badge = ETICHETTA_STATO[riga.spedizione_stato] ?? ETICHETTA_STATO.non_iniziata;
-              const href = `/spedizioni/${riga.order_number}?cliente=${encodeURIComponent(riga.cliente)}`;
+              // Propaga il filtro data attivo nella lista, così il link
+              // "← Ordini da spedire" sulla pagina di dettaglio torna alla
+              // stessa finestra invece che a quella di default (bug
+              // segnalato dall'utente 16/09/2026).
+              const query = new URLSearchParams({ cliente: riga.cliente });
+              if (dataDa) query.set("data_da", dataDa);
+              if (dataA) query.set("data_a", dataA);
+              const href = `/spedizioni/${riga.order_number}?${query.toString()}`;
               const selezionabile = riga.spedizione_stato === "confermata" && riga.spedizione_id;
               return (
                 <tr key={riga.order_number} className="bg-white hover:bg-zinc-50 dark:bg-zinc-950 dark:hover:bg-zinc-900">

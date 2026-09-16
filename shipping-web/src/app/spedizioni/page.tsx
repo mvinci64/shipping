@@ -91,7 +91,7 @@ export default async function Spedizioni({
             Nessun ordine &quot;in prenotazione&quot; nel periodo selezionato.
           </div>
         ) : (
-          <TabellaSpedizioni righe={righe} />
+          <TabellaSpedizioni righe={righe} dataDa={data_da} dataA={data_a} />
         )}
       </main>
     </div>
