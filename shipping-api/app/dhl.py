@@ -397,6 +397,34 @@ def cancella_pickup(
         raise DHLAPIError(response.status_code, _safe_json(response))
 
 
+def traccia_spedizione(shipment_tracking_number: str) -> dict:
+    """Chiama GET /shipments/{tracking}/tracking — sola lettura, nessun
+    effetto. Ritorna l'ultimo evento noto e la consegna stimata; solleva
+    DHLAPIError se DHL non trova il tracking number (es. non ancora
+    propagato nei loro sistemi appena dopo la conferma)."""
+    _, username, password = _credentials()
+    response = requests.get(
+        f"{BASE_URL}/shipments/{shipment_tracking_number}/tracking",
+        auth=(username, password),
+        timeout=20,
+    )
+    if response.status_code >= 400:
+        raise DHLAPIError(response.status_code, _safe_json(response))
+
+    dati = response.json()["shipments"][0]
+    eventi = dati.get("events") or []
+    ultimo = eventi[-1] if eventi else None
+    return {
+        "stato": ultimo["description"] if ultimo else "Nessun evento",
+        "data_evento": f"{ultimo['date']}T{ultimo['time']}" if ultimo else None,
+        "consegna_stimata": dati.get("estimatedDeliveryDate"),
+        "eventi": [
+            {"data": f"{e['date']}T{e['time']}", "descrizione": e["description"]}
+            for e in eventi
+        ],
+    }
+
+
 def _safe_json(response: requests.Response):
     try:
         return response.json()

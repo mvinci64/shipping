@@ -649,6 +649,75 @@
         }
       }
     },
+    "/spedizioni/tracking": {
+      "get": {
+        "summary": "Tracking Spedizioni",
+        "description": "Stato di tracciamento DHL reale (sola lettura, nessun effetto) per\ntutte le spedizioni confermate/ritirate con consegna richiesta nel\nperiodo (default: oggi + 13 giorni). Una chiamata a DHL per spedizione\n— se una fallisce (es. tracking non ancora propagato appena dopo la\nconferma) le altre righe restano comunque valorizzate, l'errore va\nnel campo `errore` di quella riga soltanto.",
+        "operationId": "tracking_spedizioni_spedizioni_tracking_get",
+        "parameters": [
+          {
+            "name": "data_da",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Data Da"
+            }
+          },
+          {
+            "name": "data_a",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Data A"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RigaTracking"
+                  },
+                  "title": "Response Tracking Spedizioni Spedizioni Tracking Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/spedizioni/per-ordine/{order_number}": {
       "get": {
         "summary": "Spedizione Per Ordine",
@@ -770,7 +839,7 @@
     "/spedizioni/{spedizione_id}/conferma": {
       "post": {
         "summary": "Conferma Spedizione",
-        "description": "bozza -> confermata. QUESTA CHIAMATA HA EFFETTO REALE: crea la\nspedizione DHL vera con relativo costo (dhl.crea_spedizione). Va\ninvocata solo dopo controllo umano della bozza (GET /spedizioni/{id}).\n\nGate: rifiuta (409) se il reparto non ha ancora scansionato tutti i\ncolli dell'ordine (vedi POST /cartonizzazioni/colli/conferma) — senza\nquesto controllo si potrebbe confermare (costo reale, ritiro reale)\nuna spedizione con uno scatolone ancora aperto sul tavolo.",
+        "description": "bozza -> confermata. QUESTA CHIAMATA HA EFFETTO REALE: crea la\nspedizione DHL vera con relativo costo (dhl.crea_spedizione). Va\ninvocata solo dopo controllo umano della bozza (GET /spedizioni/{id}).\n\nGate: rifiuta (409) se il reparto non ha ancora scansionato tutti i\ncolli dell'ordine (vedi POST /cartonizzazioni/colli/conferma) — senza\nquesto controllo si potrebbe confermare (costo reale, ritiro reale)\nuna spedizione con uno scatolone ancora aperto sul tavolo.\n\nAccetta anche stato 'fallita' (non solo 'bozza'): un tentativo\nprecedente può fallire per un motivo nel frattempo corretto (es. dati\ndestinatario) senza che sia mai stata creata una spedizione DHL reale\n— vedi db.segna_spedizione_fallita, non ha effetto lato DHL.",
         "operationId": "conferma_spedizione_spedizioni__spedizione_id__conferma_post",
         "parameters": [
           {
@@ -1120,6 +1189,24 @@
         ],
         "title": "ComponenteCollo"
       },
+      "EventoTracking": {
+        "properties": {
+          "data": {
+            "type": "string",
+            "title": "Data"
+          },
+          "descrizione": {
+            "type": "string",
+            "title": "Descrizione"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "descrizione"
+        ],
+        "title": "EventoTracking"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1358,6 +1445,114 @@
           "qta"
         ],
         "title": "RigaOrdine"
+      },
+      "RigaTracking": {
+        "properties": {
+          "order_number": {
+            "type": "string",
+            "title": "Order Number"
+          },
+          "cliente": {
+            "type": "string",
+            "title": "Cliente"
+          },
+          "data_consegna": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Consegna"
+          },
+          "stato": {
+            "type": "string",
+            "title": "Stato"
+          },
+          "shipment_tracking_number": {
+            "type": "string",
+            "title": "Shipment Tracking Number"
+          },
+          "dispatch_confirmation_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dispatch Confirmation Number"
+          },
+          "tracking_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tracking Url"
+          },
+          "stato_dhl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stato Dhl"
+          },
+          "consegna_stimata": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consegna Stimata"
+          },
+          "eventi": {
+            "items": {
+              "$ref": "#/components/schemas/EventoTracking"
+            },
+            "type": "array",
+            "title": "Eventi"
+          },
+          "errore": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Errore"
+          }
+        },
+        "type": "object",
+        "required": [
+          "order_number",
+          "cliente",
+          "data_consegna",
+          "stato",
+          "shipment_tracking_number",
+          "dispatch_confirmation_number",
+          "tracking_url",
+          "stato_dhl",
+          "consegna_stimata",
+          "eventi",
+          "errore"
+        ],
+        "title": "RigaTracking"
       },
       "RisultatoCartonizzazione": {
         "properties": {

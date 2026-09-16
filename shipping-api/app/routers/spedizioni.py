@@ -235,6 +235,59 @@ def elenco_spedizioni(
     return righe
 
 
+class EventoTracking(BaseModel):
+    data: str
+    descrizione: str
+
+
+class RigaTracking(BaseModel):
+    order_number: str
+    cliente: str
+    data_consegna: str | None
+    stato: str  # 'confermata' | 'ritirata' (FSM nostra, non DHL)
+    shipment_tracking_number: str
+    dispatch_confirmation_number: str | None
+    tracking_url: str | None
+    stato_dhl: str | None
+    consegna_stimata: str | None
+    eventi: list[EventoTracking]
+    errore: str | None
+
+
+@router.get("/spedizioni/tracking", response_model=list[RigaTracking])
+def tracking_spedizioni(
+    data_da: datetime.date | None = None, data_a: datetime.date | None = None,
+) -> list[RigaTracking]:
+    """Stato di tracciamento DHL reale (sola lettura, nessun effetto) per
+    tutte le spedizioni confermate/ritirate con consegna richiesta nel
+    periodo (default: oggi + 13 giorni). Una chiamata a DHL per spedizione
+    — se una fallisce (es. tracking non ancora propagato appena dopo la
+    conferma) le altre righe restano comunque valorizzate, l'errore va
+    nel campo `errore` di quella riga soltanto."""
+    oggi = datetime.date.today()
+    data_da = data_da or oggi
+    data_a = data_a or (oggi + datetime.timedelta(days=13))
+    if data_a < data_da:
+        raise HTTPException(status_code=422, detail="data_a precedente a data_da")
+
+    righe = []
+    for s in db.fetch_spedizioni_tracciabili(data_da, data_a):
+        try:
+            tracking = dhl.traccia_spedizione(s["shipment_tracking_number"])
+            stato_dhl, consegna_stimata, eventi, errore = (
+                tracking["stato"], tracking["consegna_stimata"], tracking["eventi"], None,
+            )
+        except (dhl.DHLConfigError, dhl.DHLAPIError) as exc:
+            stato_dhl, consegna_stimata, eventi, errore = None, None, [], str(exc)
+        righe.append(RigaTracking(
+            order_number=s["order_number"], cliente=s["cliente"], data_consegna=s["data_consegna"],
+            stato=s["stato"], shipment_tracking_number=s["shipment_tracking_number"],
+            dispatch_confirmation_number=s["dispatch_confirmation_number"], tracking_url=s["tracking_url"],
+            stato_dhl=stato_dhl, consegna_stimata=consegna_stimata, eventi=eventi, errore=errore,
+        ))
+    return righe
+
+
 @router.get("/spedizioni/per-ordine/{order_number}", response_model=SpedizioneResponse | None)
 def spedizione_per_ordine(order_number: str) -> SpedizioneResponse | None:
     """Spedizione più recente per un ordine, o null se non è mai stata

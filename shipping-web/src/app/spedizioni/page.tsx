@@ -38,11 +38,16 @@ export default async function Spedizioni({
               dettaglio.
             </p>
           </div>
-          <form action="/logout" method="POST">
-            <button type="submit" className="text-sm text-zinc-500 hover:underline dark:text-zinc-400">
-              Esci
-            </button>
-          </form>
+          <div className="flex items-center gap-4">
+            <Link href="/spedizioni/tracking" className="text-sm text-zinc-500 hover:underline dark:text-zinc-400">
+              Tracking
+            </Link>
+            <form action="/logout" method="POST">
+              <button type="submit" className="text-sm text-zinc-500 hover:underline dark:text-zinc-400">
+                Esci
+              </button>
+            </form>
+          </div>
         </div>
 
         <form className="flex flex-wrap items-end gap-3 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">

@@ -325,6 +325,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/spedizioni/tracking": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tracking Spedizioni
+         * @description Stato di tracciamento DHL reale (sola lettura, nessun effetto) per
+         *     tutte le spedizioni confermate/ritirate con consegna richiesta nel
+         *     periodo (default: oggi + 13 giorni). Una chiamata a DHL per spedizione
+         *     — se una fallisce (es. tracking non ancora propagato appena dopo la
+         *     conferma) le altre righe restano comunque valorizzate, l'errore va
+         *     nel campo `errore` di quella riga soltanto.
+         */
+        get: operations["tracking_spedizioni_spedizioni_tracking_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/spedizioni/per-ordine/{order_number}": {
         parameters: {
             query?: never;
@@ -390,6 +415,11 @@ export interface paths {
          *     colli dell'ordine (vedi POST /cartonizzazioni/colli/conferma) — senza
          *     questo controllo si potrebbe confermare (costo reale, ritiro reale)
          *     una spedizione con uno scatolone ancora aperto sul tavolo.
+         *
+         *     Accetta anche stato 'fallita' (non solo 'bozza'): un tentativo
+         *     precedente può fallire per un motivo nel frattempo corretto (es. dati
+         *     destinatario) senza che sia mai stata creata una spedizione DHL reale
+         *     — vedi db.segna_spedizione_fallita, non ha effetto lato DHL.
          */
         post: operations["conferma_spedizione_spedizioni__spedizione_id__conferma_post"];
         delete?: never;
@@ -555,6 +585,13 @@ export interface components {
             /** Pezzi */
             pezzi: number;
         };
+        /** EventoTracking */
+        EventoTracking: {
+            /** Data */
+            data: string;
+            /** Descrizione */
+            descrizione: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -638,6 +675,31 @@ export interface components {
             sku: string;
             /** Qta */
             qta: number;
+        };
+        /** RigaTracking */
+        RigaTracking: {
+            /** Order Number */
+            order_number: string;
+            /** Cliente */
+            cliente: string;
+            /** Data Consegna */
+            data_consegna: string | null;
+            /** Stato */
+            stato: string;
+            /** Shipment Tracking Number */
+            shipment_tracking_number: string;
+            /** Dispatch Confirmation Number */
+            dispatch_confirmation_number: string | null;
+            /** Tracking Url */
+            tracking_url: string | null;
+            /** Stato Dhl */
+            stato_dhl: string | null;
+            /** Consegna Stimata */
+            consegna_stimata: string | null;
+            /** Eventi */
+            eventi: components["schemas"]["EventoTracking"][];
+            /** Errore */
+            errore: string | null;
         };
         /** RisultatoCartonizzazione */
         RisultatoCartonizzazione: {
@@ -1229,6 +1291,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RigaElenco"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tracking_spedizioni_spedizioni_tracking_get: {
+        parameters: {
+            query?: {
+                data_da?: string | null;
+                data_a?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RigaTracking"][];
                 };
             };
             /** @description Validation Error */

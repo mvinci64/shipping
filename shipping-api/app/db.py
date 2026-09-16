@@ -634,3 +634,39 @@ def fetch_colli_misti_per_cartonize(order_number: str) -> list[dict] | None:
         for cm in fetch_colli_misti(order_number)
     ]
     return colli_misti or None
+
+
+def fetch_spedizioni_tracciabili(data_da, data_a) -> list[dict]:
+    """Spedizioni con un tracking number reale (stato 'confermata' o
+    'ritirata') per ordini con consegna richiesta nella finestra — la
+    lista su cui interrogare il tracking DHL (sola lettura, vedi
+    dhl.traccia_spedizione). Una per order_number: la più recente."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT DISTINCT ON (s.order_number)
+                s.order_number, c.company_name, s.stato,
+                s.shipment_tracking_number, s.dispatch_confirmation_number,
+                s.tracking_url, o.requested_delivery_date
+            FROM viscotta.spedizioni s
+            JOIN viscotta.orders o ON o.order_number = s.order_number
+            JOIN viscotta.customers c ON c.id = o.customer_id
+            WHERE s.stato IN ('confermata', 'ritirata')
+              AND s.shipment_tracking_number IS NOT NULL
+              AND o.requested_delivery_date BETWEEN %s AND %s
+            ORDER BY s.order_number, s.creata_at DESC
+            """,
+            (data_da, data_a),
+        ).fetchall()
+    return [
+        {
+            "order_number": order_number,
+            "cliente": cliente,
+            "stato": stato,
+            "shipment_tracking_number": tracking,
+            "dispatch_confirmation_number": prg,
+            "tracking_url": tracking_url,
+            "data_consegna": data_consegna.isoformat() if data_consegna else None,
+        }
+        for order_number, cliente, stato, tracking, prg, tracking_url, data_consegna in rows
+    ]
