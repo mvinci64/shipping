@@ -34,7 +34,7 @@ export default async function TrackingSpedizioni({
 
   return (
     <div className="flex flex-1 flex-col items-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex w-full max-w-4xl flex-1 flex-col gap-6 px-8 py-16">
+      <main className="flex w-full max-w-5xl flex-1 flex-col gap-6 px-8 py-16">
         <div>
           <Link href="/spedizioni" className="text-xs text-zinc-500 hover:underline dark:text-zinc-400">
             ← Ordini da spedire
@@ -94,7 +94,16 @@ export default async function TrackingSpedizioni({
           </div>
         ) : (
           <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
-            <table className="w-full text-left text-sm">
+            <table className="w-full min-w-[900px] table-fixed text-left text-sm">
+              <colgroup>
+                <col className="w-[8%]" />
+                <col className="w-[16%]" />
+                <col className="w-[16%]" />
+                <col className="w-[11%]" />
+                <col className="w-[14%]" />
+                <col className="w-[21%]" />
+                <col className="w-[14%]" />
+              </colgroup>
               <thead className="bg-zinc-100 text-zinc-600 dark:bg-zinc-900 dark:text-zinc-400">
                 <tr>
                   <th className="px-4 py-2 font-medium">Consegna</th>
@@ -117,7 +126,7 @@ export default async function TrackingSpedizioni({
                         {riga.order_number}
                       </Link>
                     </td>
-                    <td className="px-4 py-2 text-zinc-900 dark:text-zinc-100">{riga.cliente}</td>
+                    <td className="break-words px-4 py-2 text-zinc-900 dark:text-zinc-100">{riga.cliente}</td>
                     <td className="whitespace-nowrap px-4 py-2 font-mono text-xs text-zinc-700 dark:text-zinc-300">
                       {riga.tracking_url ? (
                         <a href={riga.tracking_url} target="_blank" className="hover:underline">
