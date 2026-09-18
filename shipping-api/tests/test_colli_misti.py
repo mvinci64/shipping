@@ -47,3 +47,35 @@ def test_cartonize_order_collo_misto_sku_non_censito_solleva_keyerror():
     colli_misti = [{"formato": "WP40", "componenti": [{"sku": "SKU-IGNOTO", "pezzi": 50}]}]
     with pytest.raises(KeyError):
         cartonize_order(rows, colli_misti=colli_misti)
+
+
+def test_cartonize_order_sfuso_non_entra_in_scatolone_gia_pieno_di_wp40():
+    # ORD-20260505-4944 (17/09/2026): 6 WP40 (4 standard + 2 colli misti)
+    # riempiono già lo scatolone (6/6 posti) — i prodotti sfusi (TCAP200SC,
+    # TCAP500IR) non hanno più spazio fisico e devono finire in un secondo
+    # scatolone, non essere infilati in quello pieno (bug: gli sfusi hanno
+    # 0 posti, quindi entravano comunque finché non si aggiungeva il
+    # controllo su posti_usati < POSTI_SCATOLONE).
+    rows = [
+        {"sku": "CANTS100", "qta": 12},
+        {"sku": "CHMS50", "qta": 12},
+        {"sku": "GRM100", "qta": 12},
+        {"sku": "MSAL080", "qta": 12},
+        {"sku": "TCAP200SC", "qta": 12},
+        {"sku": "TCAP500IR", "qta": 6},
+        {"sku": "VP01", "qta": 50},
+        {"sku": "VP04", "qta": 50},
+        {"sku": "VP05", "qta": 50},
+        {"sku": "VP06", "qta": 50},
+    ]
+    colli_misti = [
+        {"formato": "WP40", "componenti": [{"sku": "VP01", "pezzi": 50}, {"sku": "VP06", "pezzi": 50}]},
+        {"formato": "WP40", "componenti": [{"sku": "VP05", "pezzi": 50}, {"sku": "VP04", "pezzi": 50}]},
+    ]
+    result = cartonize_order(rows, colli_misti=colli_misti)
+    assert result["n_scatoloni"] == 2
+    primo, secondo = result["scatoloni"]
+    assert primo["posti_usati"] == 6
+    assert all(e["formato"] == "WP40" for e in primo["contenuto"])
+    assert secondo["posti_usati"] == 0
+    assert {e["sku"] for e in secondo["contenuto"]} == {"TCAP200SC", "TCAP500IR"}

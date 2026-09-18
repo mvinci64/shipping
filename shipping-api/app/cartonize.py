@@ -154,7 +154,10 @@ def pack_cartons(boxes):
         fmt, sku, pezzi, peso = box[:4]
         componenti = box[4] if len(box) > 4 else None
         posti = POSTI.get(fmt, 0)
-        target = next((c for c in cartons if c["posti_usati"] + posti <= POSTI_SCATOLONE), None)
+        target = next(
+            (c for c in cartons if c["posti_usati"] < POSTI_SCATOLONE and c["posti_usati"] + posti <= POSTI_SCATOLONE),
+            None,
+        )
         if target is None:
             target = {"posti_usati": 0, "contenuto": [], "peso_g": TARA_SCATOLONE_G + CARTA_RIEMPIMENTO_G}
             cartons.append(target)
