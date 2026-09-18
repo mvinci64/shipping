@@ -26,6 +26,7 @@ class SpedizioneResponse(BaseModel):
     creata_at: str
     confermata_at: str | None
     ritirata_at: str | None
+    contrassegno_eur: float | None = None
 
 # customers.country nel DB del Portal è incoerente: alcuni clienti hanno il
 # nome esteso ("Italia", 109 su 166 attivi), altri già il codice ISO2 ("IT",
@@ -121,6 +122,28 @@ def _ordine_e_destinatario(order_number: str) -> tuple[dict, dict]:
     return ordine, db.fetch_destinatario(order_number)
 
 
+def _contrassegno_eur(order_number: str, ordine: dict) -> float | None:
+    """Importo da richiedere in contrassegno alla consegna, o None se
+    l'ordine è già pagato in anticipo. Stessa logica della vista Ordini del
+    Portal (CASE WHEN payment_advance_discount THEN 'Anticipo' ELSE
+    'Contrassegno' END, confermata dall'utente 18/09/2026): nessuna colonna
+    dedicata "modalità di pagamento", solo questi due casi — NULL si
+    comporta come False (contrassegno). dhl.crea_spedizione aggiunge il
+    servizio contrassegno (KB) sulla spedizione, così il corriere non
+    rilascia la merce senza prima incassare."""
+    if ordine["payment_advance_discount"]:
+        return None
+    if ordine["grand_total"] is None:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Ordine {order_number} non pagato in anticipo (contrassegno) ma senza grand_total: "
+                "impossibile determinare l'importo da richiedere alla consegna"
+            ),
+        )
+    return ordine["grand_total"]
+
+
 def _pesi_scatoloni_kg(order_number: str, ordine: dict) -> list[float]:
     """Usa SEMPRE _cartonize_ordine_reale (colli misti manuali inclusi):
     cartonize_order() diretta ignora i colli misti registrati per l'ordine
@@ -176,6 +199,7 @@ def valida_spedizione(order_number: str) -> dict:
         "order_number": order_number,
         "n_scatoloni": len(pesi_kg),
         "pesi_scatoloni_kg": pesi_kg,
+        "contrassegno_eur": _contrassegno_eur(order_number, ordine),
         "dhl": risposta_dhl,
     }
 
@@ -192,7 +216,7 @@ def crea_bozza_spedizione(order_number: str) -> SpedizioneResponse:
         order_number=order_number, corriere="dhl", product_code=product_code,
         pesi_scatoloni_kg=pesi_kg, prezzo_stimato_eur=prezzo,
     )
-    return SpedizioneResponse(**bozza)
+    return SpedizioneResponse(**bozza, contrassegno_eur=_contrassegno_eur(order_number, ordine))
 
 
 class RigaElenco(BaseModel):
@@ -293,6 +317,11 @@ def tracking_spedizioni(
     return righe
 
 
+def _con_contrassegno(spedizione: dict) -> SpedizioneResponse:
+    ordine = db.fetch_order(spedizione["order_number"])
+    return SpedizioneResponse(**spedizione, contrassegno_eur=_contrassegno_eur(spedizione["order_number"], ordine))
+
+
 @router.get("/spedizioni/per-ordine/{order_number}", response_model=SpedizioneResponse | None)
 def spedizione_per_ordine(order_number: str) -> SpedizioneResponse | None:
     """Spedizione più recente per un ordine, o null se non è mai stata
@@ -300,7 +329,7 @@ def spedizione_per_ordine(order_number: str) -> SpedizioneResponse | None:
     dalla pagina di dettaglio ordine, che non ha altrimenti modo di
     risalire allo spedizione_id partendo dal solo order_number."""
     spedizione = db.fetch_ultima_spedizione_per_ordine(order_number)
-    return SpedizioneResponse(**spedizione) if spedizione else None
+    return _con_contrassegno(spedizione) if spedizione else None
 
 
 @router.get("/spedizioni/{spedizione_id}", response_model=SpedizioneResponse)
@@ -308,7 +337,7 @@ def dettaglio_spedizione(spedizione_id: str) -> SpedizioneResponse:
     spedizione = db.fetch_spedizione(spedizione_id)
     if spedizione is None:
         raise HTTPException(status_code=404, detail=f"Spedizione {spedizione_id} non trovata")
-    return SpedizioneResponse(**spedizione)
+    return _con_contrassegno(spedizione)
 
 
 @router.post("/spedizioni/{spedizione_id}/conferma", response_model=SpedizioneResponse)
@@ -369,6 +398,7 @@ def conferma_spedizione(spedizione_id: str) -> SpedizioneResponse:
             destinatario_paese=_iso2(destinatario["paese"]),
             pesi_scatoloni_kg=spedizione["pesi_scatoloni_kg"],
             data_spedizione_iso=_prossima_data_spedizione(),
+            contrassegno_eur=_contrassegno_eur(spedizione["order_number"], ordine),
         )
     except (dhl.DHLConfigError, dhl.DHLAPIError) as exc:
         db.segna_spedizione_fallita(spedizione_id, errore=str(exc))

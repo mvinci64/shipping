@@ -1827,6 +1827,17 @@
               }
             ],
             "title": "Ritirata At"
+          },
+          "contrassegno_eur": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contrassegno Eur"
           }
         },
         "type": "object",

@@ -780,6 +780,8 @@ export interface components {
             confermata_at: string | null;
             /** Ritirata At */
             ritirata_at: string | null;
+            /** Contrassegno Eur */
+            contrassegno_eur?: number | null;
         };
         /** StatoColli */
         StatoColli: {

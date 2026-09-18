@@ -34,7 +34,8 @@ def fetch_order(order_number: str) -> dict | None:
     with get_connection() as conn:
         row = conn.execute(
             """
-            SELECT o.id, c.company_name, o.requested_delivery_date
+            SELECT o.id, c.company_name, o.requested_delivery_date,
+                   o.payment_advance_discount, o.grand_total
             FROM viscotta.orders o
             JOIN viscotta.customers c ON c.id = o.customer_id
             WHERE o.order_number = %s
@@ -43,7 +44,7 @@ def fetch_order(order_number: str) -> dict | None:
         ).fetchone()
         if row is None:
             return None
-        order_id, cliente, data_consegna = row
+        order_id, cliente, data_consegna, payment_advance_discount, grand_total = row
 
         righe = conn.execute(
             "SELECT sku, quantity FROM viscotta.order_items WHERE order_id = %s",
@@ -55,6 +56,12 @@ def fetch_order(order_number: str) -> dict | None:
         "cliente": cliente,
         "data_consegna": data_consegna.isoformat() if data_consegna else None,
         "righe": [{"sku": sku, "qta": float(qta)} for sku, qta in righe],
+        # modalità di pagamento: stessa logica della vista Ordini del
+        # Portal (CASE WHEN payment_advance_discount THEN 'Anticipo' ELSE
+        # 'Contrassegno' END) — nessuna colonna dedicata, solo questi due
+        # casi. NULL (mai valorizzato) si comporta come False: contrassegno.
+        "payment_advance_discount": bool(payment_advance_discount),
+        "grand_total": float(grand_total) if grand_total is not None else None,
     }
 
 

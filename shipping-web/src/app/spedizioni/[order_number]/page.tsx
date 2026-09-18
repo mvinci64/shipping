@@ -131,6 +131,11 @@ export default async function DettaglioSpedizione({
                 Bozza creata — prodotto {spedizione.data.product_code ?? "—"}, prezzo stimato{" "}
                 {spedizione.data.prezzo_stimato_eur?.toFixed(2) ?? "—"} €
               </p>
+              {spedizione.data.contrassegno_eur != null && (
+                <p className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                  Contrassegno: {spedizione.data.contrassegno_eur.toFixed(2)} € da riscuotere alla consegna
+                </p>
+              )}
               <AzioneForm
                 action={confermaSpedizioneAction.bind(null, spedizione.data.id, order_number)}
                 etichetta="Conferma spedizione (effetto reale)"
