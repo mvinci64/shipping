@@ -6,8 +6,7 @@ from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel
 
 from app import db, dhl
-from app.cartonize import cartonize_order
-from app.routers.cartonizzazioni import _stato_colli
+from app.routers.cartonizzazioni import _cartonize_ordine_reale, _stato_colli
 
 router = APIRouter()
 
@@ -122,8 +121,14 @@ def _ordine_e_destinatario(order_number: str) -> tuple[dict, dict]:
     return ordine, db.fetch_destinatario(order_number)
 
 
-def _pesi_scatoloni_kg(ordine: dict) -> list[float]:
-    cartonizzazione = cartonize_order(ordine["righe"])
+def _pesi_scatoloni_kg(order_number: str, ordine: dict) -> list[float]:
+    """Usa SEMPRE _cartonize_ordine_reale (colli misti manuali inclusi):
+    cartonize_order() diretta ignora i colli misti registrati per l'ordine
+    e sottostima peso/numero scatoloni della spedizione DHL reale — bug
+    scoperto il 18/09/2026 preparando ORD-20260505-4944 (VP01/VP02/VP04/
+    VP05/VP06 non hanno un PEZZI_PER_COLLO proprio, quindi senza i colli
+    misti finivano silenziosamente in non_censiti e sparivano dal peso)."""
+    cartonizzazione = _cartonize_ordine_reale(order_number, ordine["righe"])
     if cartonizzazione["n_scatoloni"] == 0:
         raise HTTPException(status_code=422, detail="Nessuno scatolone: ordine senza prodotti censiti")
     return [round(c["peso_g"] / 1000, 3) for c in cartonizzazione["scatoloni"]]
@@ -165,7 +170,7 @@ def valida_spedizione(order_number: str) -> dict:
     "bozza" emulata. Combina cartonizzazione (pesi scatoloni) e indirizzo
     cliente da DB."""
     ordine, destinatario = _ordine_e_destinatario(order_number)
-    pesi_kg = _pesi_scatoloni_kg(ordine)
+    pesi_kg = _pesi_scatoloni_kg(order_number, ordine)
     risposta_dhl = _quota(destinatario, pesi_kg, _prossima_data_spedizione())
     return {
         "order_number": order_number,
@@ -180,7 +185,7 @@ def crea_bozza_spedizione(order_number: str) -> SpedizioneResponse:
     """Crea la bozza (stato 'bozza'): quota via /rates e salva su DB.
     Nessuna chiamata DHL con effetto reale — solo /rates, come /valida."""
     ordine, destinatario = _ordine_e_destinatario(order_number)
-    pesi_kg = _pesi_scatoloni_kg(ordine)
+    pesi_kg = _pesi_scatoloni_kg(order_number, ordine)
     risposta_dhl = _quota(destinatario, pesi_kg, _prossima_data_spedizione())
     product_code, prezzo = _scegli_prodotto(risposta_dhl)
     bozza = db.crea_spedizione_bozza(
@@ -218,7 +223,7 @@ def elenco_spedizioni(
 
     righe = []
     for ordine in db.fetch_elenco_spedizioni(data_da, data_a):
-        cartonizzazione = cartonize_order(ordine["righe"])
+        cartonizzazione = _cartonize_ordine_reale(ordine["order_number"], ordine["righe"])
         n_colli = cartonizzazione["n_scatoloni"]
         confermati = ordine["colli_confermati"]
         spedizione = ordine["spedizione"]
