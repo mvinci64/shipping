@@ -89,12 +89,19 @@ def make_inner_labels_pdf(
     gtins: dict | None = None,
     nomi_prodotto: dict | None = None,
     mostra_lotto: bool = False,
+    note_omaggio: list[str] | None = None,
 ) -> bytes:
     """mostra_lotto=False (default, deciso dall'utente 07/09/2026): lotto e
     scadenza non sono determinabili in modo affidabile (vedi nota su
     easyfatt.tmovmagazz in cartonizzazioni.py), quindi vengono omessi sempre
     dall'etichetta collo — il barcode GS1 resta col solo GTIN. mostra_lotto=
-    True resta disponibile per chi lo richiede esplicitamente."""
+    True resta disponibile per chi lo richiede esplicitamente.
+
+    note_omaggio: colli omaggio/promozione registrati per l'ordine (vedi
+    sql/colli_omaggio_manuali.sql) — una pagina in coda per ciascuno, stesso
+    formato di labels.make_gift_label_pdf, deciso dall'utente 27/09/2026
+    perché escano nella stessa stampa delle altre etichette collo invece che
+    con una chiamata separata."""
     from reportlab.lib.units import mm
     from reportlab.pdfgen import canvas
     from reportlab.graphics.barcode import code128
@@ -199,6 +206,73 @@ def make_inner_labels_pdf(
             c.setFont("Helvetica", 6)
             c.drawRightString(W - margine, 14.5 * mm, f"GTIN {gtin}")
         c.showPage()
+
+    for nota in note_omaggio or []:
+        _draw_gift_page(c, W, H, margine, larghezza_utile, order_number, cliente, nota)
+
+    c.save()
+    return buf.getvalue()
+
+
+def _draw_gift_page(c, W, H, margine, larghezza_utile, order_number: str, cliente: str, nota: str | None) -> None:
+    """Una pagina di etichetta omaggio/promozione (WP40): cliente, dicitura
+    generica e — se registrata via colli_omaggio_manuali — la nota testuale
+    libera del reparto (es. "materiale POP", "30 paste assortite
+    flowpaccate..."). Condivisa da make_gift_label_pdf (stampa isolata) e
+    make_inner_labels_pdf (stampata insieme alle altre etichette collo
+    dell'ordine, deciso dall'utente 27/09/2026)."""
+    from reportlab.lib.units import mm
+
+    y = H - 8 * mm
+    c.setFont("Helvetica-Bold", 9)
+    c.drawString(margine, y, "VISCOTTA")
+    c.setFont("Helvetica", 8)
+    c.drawRightString(W - margine, y, f"Ordine {order_number}")
+    y -= 11 * mm
+
+    righe_cliente = _a_capo(c, cliente, "Helvetica-Bold", 22, larghezza_utile, righe_max=2)
+    c.setFont("Helvetica-Bold", 22)
+    for riga in righe_cliente:
+        c.drawString(margine, y, riga)
+        y -= 8.5 * mm
+    y -= 6.5 * mm if len(righe_cliente) == 1 else 0
+
+    y -= 4 * mm
+    c.setFont("Helvetica-Bold", 20)
+    c.drawString(margine, y, "OMAGGIO / PROMOZIONE")
+    y -= 9 * mm
+    c.setFont("Helvetica", 9)
+    c.drawString(margine, y, "(WP40)")
+
+    if nota:
+        y -= 8 * mm
+        c.setFont("Helvetica-Bold", 13)
+        for riga in _a_capo(c, nota, "Helvetica-Bold", 13, larghezza_utile, righe_max=4):
+            c.drawString(margine, y, riga)
+            y -= 6 * mm
+
+    c.showPage()
+
+
+def make_gift_label_pdf(order_number: str, cliente: str, n_etichette: int = 1, nota: str | None = None) -> bytes:
+    """Etichetta collo per omaggi/promozioni (WP40) — generata su richiesta,
+    non da una riga d'ordine: niente SKU/pezzi/lotto, solo cliente e la
+    dicitura "OMAGGIO/PROMOZIONE" (deciso dall'utente 27/09/2026), più
+    l'eventuale nota libera del reparto. Stesso formato fisico (15×10 cm)
+    delle altre etichette collo per coerenza in laboratorio. n_etichette
+    genera più copie identiche in pagine separate, per il caso di più WP40
+    omaggio sullo stesso ordine."""
+    from reportlab.lib.units import mm
+    from reportlab.pdfgen import canvas
+
+    buf = io.BytesIO()
+    W, H = 150 * mm, 100 * mm
+    c = canvas.Canvas(buf, pagesize=(W, H))
+    margine = 8 * mm
+    larghezza_utile = W - 2 * margine
+
+    for _ in range(n_etichette):
+        _draw_gift_page(c, W, H, margine, larghezza_utile, order_number, cliente, nota)
     c.save()
     return buf.getvalue()
 

@@ -52,6 +52,10 @@ GRAMMATURA_G = {
     # peso di TCAP500SC (500gr esplicito nel nome prodotto), cambia solo
     # la confezione (in ruoto invece che scatola).
     "TCAP500SC": 500, "TCAP500IR": 500,
+    # SCAT20V16, stessa famiglia di SCAT20V08 ma formato più grande —
+    # trattato come sfuso (etichetta generica, come le Torte da 500) su
+    # richiesta dell'utente 27/09/2026, peso confermato a parte (320 g/pz).
+    "SCAT20V16": 320,
 }
 
 # SKU "sfusi": niente scatola interna WP40/WP50, i pezzi riempiono
@@ -64,6 +68,7 @@ SFUSO_SKUS = {
     "TCAP200SC", "TCAP500SC", "TCAP500IR",
     "SCATR05A", "SCATR10A", "SCATRN05A", "SCATRN10A",
     "SCATM06M", "SCATM06SR", "SCATM06SA",
+    "SCAT20V16",
 }
 
 
@@ -105,6 +110,14 @@ PEZZI_PER_COLLO = {
     "CHMS1KG":   {"WP50": 2, "WP40": 1},
     "CANTS1KG":  {"WP50": 2, "WP40": 1},
     "GRM1KG":    {"WP50": 2, "WP40": 1},
+    # Pasta di mandorla singola (VP01/VP02/VP04/VP05/VP06, 20 g/pz — vedi
+    # GRAMMATURA_G): configurazione standard confermata dall'utente
+    # 27/09/2026, 100 pz per WP40 (niente WP50). Prima gestita solo via
+    # collo misto manuale (sql/colli_misti_manuali.sql); resta comunque
+    # possibile registrare un collo misto quando in un WP40 vanno mescolati
+    # più sapori invece di un solo SKU da 100 pezzi.
+    "VP01": {"WP40": 100}, "VP02": {"WP40": 100}, "VP04": {"WP40": 100},
+    "VP05": {"WP40": 100}, "VP06": {"WP40": 100},
 }
 
 # sku: {formato: (pezzi, peso_g)} — peso ricalcolato dalla formula sopra,

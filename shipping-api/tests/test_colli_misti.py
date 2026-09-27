@@ -28,11 +28,17 @@ def test_cartonize_order_con_collo_misto_non_segnala_non_censiti():
 
 def test_cartonize_order_collo_misto_lascia_il_resto_alla_cartonizzazione_normale():
     # 80 VP01 ordinati, solo 50 finiscono nel collo misto: i 30 residui
-    # restano non censiti (VP01 non ha un PEZZI_PER_COLLO proprio)
+    # vanno in un WP40 proprio (VP01 ha PEZZI_PER_COLLO WP40=100 dal
+    # 27/09/2026), niente più non_censiti
     rows = [{"sku": "VP01", "qta": 80}, {"sku": "VP06", "qta": 50}]
     colli_misti = [{"formato": "WP40", "componenti": [{"sku": "VP01", "pezzi": 50}, {"sku": "VP06", "pezzi": 50}]}]
     result = cartonize_order(rows, colli_misti=colli_misti)
-    assert result["non_censiti"] == [{"sku": "VP01", "qta": 30}]
+    assert result["non_censiti"] == []
+    residuo = next(
+        item for carton in result["scatoloni"] for item in carton["contenuto"]
+        if item.get("sku") == "VP01"
+    )
+    assert residuo == {"formato": "WP40", "sku": "VP01", "pezzi": 30, "peso_g": 930}
 
 
 def test_cartonize_order_collo_misto_quantita_eccessiva_solleva_errore():

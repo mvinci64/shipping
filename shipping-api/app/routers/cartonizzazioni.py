@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from app import db
 from app.cartonize import cartonize_order
 from app.day_plan import make_day_plan_pdf
-from app.labels import make_carton_summary_labels_pdf, make_inner_labels_pdf
+from app.labels import make_carton_summary_labels_pdf, make_gift_label_pdf, make_inner_labels_pdf
 
 router = APIRouter()
 
@@ -178,7 +178,11 @@ def etichette_colli_ordine_reale(order_number: str, con_lotto: bool = False) -> 
     lotti = {}
     if con_lotto:
         lotti = {sku: lotto for sku in skus if (lotto := db.fetch_ultimo_lotto(sku)) is not None}
-    pdf = make_inner_labels_pdf(order_number, ordine["cliente"], result, lotti, gtins, nomi, mostra_lotto=con_lotto)
+    note_omaggio = [co["nota"] for co in db.fetch_colli_omaggio(order_number)]
+    pdf = make_inner_labels_pdf(
+        order_number, ordine["cliente"], result, lotti, gtins, nomi,
+        mostra_lotto=con_lotto, note_omaggio=note_omaggio,
+    )
     return Response(
         content=pdf,
         media_type="application/pdf",
@@ -201,6 +205,54 @@ def etichette_scatolone_ordine_reale(order_number: str) -> Response:
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="etichette_scatolone_{order_number}.pdf"'},
     )
+
+
+@router.get("/cartonizzazioni/{order_number}/etichetta-omaggio")
+def etichetta_omaggio_ordine_reale(order_number: str, n: int = 1) -> Response:
+    """Etichetta collo per omaggi/promozioni (WP40), stampa isolata: non è
+    legata a una riga d'ordine, solo cliente + dicitura generica. n copie
+    per più WP40 omaggio sullo stesso ordine. Per farla uscire insieme alle
+    altre etichette collo dell'ordine (con una nota testuale), registrare
+    invece un collo omaggio con POST /cartonizzazioni/{order_number}/colli-omaggio
+    — vedi etichette_colli_ordine_reale."""
+    ordine = _ordine_reale(order_number)
+    pdf = make_gift_label_pdf(order_number, ordine["cliente"], n_etichette=n)
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="etichetta_omaggio_{order_number}.pdf"'},
+    )
+
+
+class RichiestaColloOmaggio(BaseModel):
+    nota: str
+
+
+class ColloOmaggio(BaseModel):
+    id: str
+    order_number: str
+    nota: str
+
+
+@router.post("/cartonizzazioni/{order_number}/colli-omaggio", response_model=ColloOmaggio)
+def aggiungi_collo_omaggio(order_number: str, richiesta: RichiestaColloOmaggio) -> ColloOmaggio:
+    """Registra un collo omaggio/promozione (WP40 aggiunto a mano dal
+    reparto, non da una riga d'ordine): la nota finisce stampata insieme
+    alle altre etichette collo dell'ordine (etichette-colli), non serve una
+    stampa separata."""
+    collo = db.aggiungi_collo_omaggio(order_number, richiesta.nota)
+    return ColloOmaggio(**collo)
+
+
+@router.get("/cartonizzazioni/{order_number}/colli-omaggio", response_model=list[ColloOmaggio])
+def elenco_colli_omaggio(order_number: str) -> list[ColloOmaggio]:
+    return [ColloOmaggio(order_number=order_number, **co) for co in db.fetch_colli_omaggio(order_number)]
+
+
+@router.delete("/cartonizzazioni/colli-omaggio/{collo_id}", status_code=204)
+def rimuovi_collo_omaggio(collo_id: str) -> None:
+    if not db.elimina_collo_omaggio(collo_id):
+        raise HTTPException(status_code=404, detail=f"Collo omaggio {collo_id} non trovato")
 
 
 class RichiestaColloMisto(BaseModel):

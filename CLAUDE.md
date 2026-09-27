@@ -35,7 +35,7 @@ Decisione presa e da mantenere: **backend Python (FastAPI) + frontend TypeScript
 
 - Scatole interne: **WP50** (tara 200 g, occupa 2 posti) e **WP40** (tara 150 g, 1 posto).
 - **Scatolone VISCOTTA = 6 posti** (3×WP50 o 6×WP40 o mix). Tara 900 g (pesata reale su ORD-20260721-4387, 07/09/2026) + 500 g di carta da riempimento in media per scatolone (1400 g totali aggiunti, vedi `TARA_SCATOLONE_G`/`CARTA_RIEMPIMENTO_G` in `shipping-api/app/cartonize.py`).
-- Prodotti standard (CHMS50, GRM100, CANTS100, CMEN080, MCIOC080, MSAL080): 24 pz → WP50, 12 pz → WP40. TCAP075: 12 → WP50, 6 → WP40. CANT200/BRUT150/VP08BUST: 12 → WP50, 6 → WP40 (pesi collo censiti). BOXOV/SCAT20V08: solo WP40 da 6 (220 g/pezzo). Scatole regalo/Natale: 6 → WP40 (SKU da confermare).
+- Prodotti standard (CHMS50, GRM100, CANTS100, CMEN080, MCIOC080, MSAL080): 24 pz → WP50, 12 pz → WP40. TCAP075: 12 → WP50, 6 → WP40. CANT200/BRUT150/VP08BUST: 12 → WP50, 6 → WP40 (pesi collo censiti). BOXOV/SCAT20V08: solo WP40 da 6 (220 g/pezzo). Scatole regalo/Natale: 6 → WP40 (SKU da confermare). SCAT20V16: sfuso (etichetta generica, come le Torte da 500), 320 g/pz. Paste di mandorla (VP01/VP02/VP04/VP05/VP06, 20 g/pz): 100 pz → WP40.
 - Ottimizzazione: prima WP50 pieni, resto in WP40; prodotti non censiti negli spazi liberi dell'ultimo scatolone.
 - Il **quanto di imballo** è anche vincolo del piano di produzione (miniMRP): lotti arrotondati a colli pieni (viste V6/V7). Oggi produzione+packaging+spedizione = stesse 3 persone; domani squadre separate → il coordinamento implicito va reso esplicito nel sistema.
 

@@ -643,6 +643,45 @@ def fetch_colli_misti_per_cartonize(order_number: str) -> list[dict] | None:
     return colli_misti or None
 
 
+def aggiungi_collo_omaggio(order_number: str, nota: str) -> dict:
+    """Registra un collo omaggio/promozione (WP40 aggiunto a mano, non da
+    riga d'ordine — vedi sql/colli_omaggio_manuali.sql). nota: testo libero
+    che finisce stampato sull'etichetta collo insieme alle altre."""
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            INSERT INTO viscotta.colli_omaggio_manuali (order_number, nota)
+            VALUES (%s, %s)
+            RETURNING id, order_number, nota
+            """,
+            (order_number, nota),
+        ).fetchone()
+        conn.commit()
+    id_, order_number, nota = row
+    return {"id": str(id_), "order_number": order_number, "nota": nota}
+
+
+def fetch_colli_omaggio(order_number: str) -> list[dict]:
+    """Colli omaggio registrati per un ordine, più vecchi prima."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, nota FROM viscotta.colli_omaggio_manuali
+            WHERE order_number = %s
+            ORDER BY creata_at
+            """,
+            (order_number,),
+        ).fetchall()
+    return [{"id": str(id_), "nota": nota} for id_, nota in rows]
+
+
+def elimina_collo_omaggio(collo_id: str) -> bool:
+    with get_connection() as conn:
+        cur = conn.execute("DELETE FROM viscotta.colli_omaggio_manuali WHERE id = %s", (collo_id,))
+        conn.commit()
+    return cur.rowcount > 0
+
+
 def fetch_spedizioni_tracciabili(data_da, data_a) -> list[dict]:
     """Spedizioni con un tracking number reale (stato 'confermata' o
     'ritirata') per ordini con consegna richiesta nella finestra — la
