@@ -47,6 +47,10 @@ GRAMMATURA_G = {
     # assortite (20 g/pz) — censita 14/09/2026 per il primo collo misto
     # reale, ORD-20260505-4944 (50+50 VP01/VP06 e VP05/VP04 in due WP40).
     "VP01": 20, "VP02": 20, "VP04": 20, "VP05": 20, "VP06": 20,
+    # VP08 ("ricoperto al Cioccolato Fondente"), stessa famiglia e peso
+    # delle altre paste singole — censita 01/10/2026, primo ordine reale
+    # con VP08 IMPORT-DMLAB-20260923-01 (100 VP01 + 100 VP08).
+    "VP08": 20,
     # Stessa Torta Caprese di TCAP200SC, formato da 500g — TCAP500IR
     # ("confezione con ruoto") confermato dall'utente 14/09/2026 stesso
     # peso di TCAP500SC (500gr esplicito nel nome prodotto), cambia solo
@@ -118,6 +122,8 @@ PEZZI_PER_COLLO = {
     # più sapori invece di un solo SKU da 100 pezzi.
     "VP01": {"WP40": 100}, "VP02": {"WP40": 100}, "VP04": {"WP40": 100},
     "VP05": {"WP40": 100}, "VP06": {"WP40": 100},
+    # VP08, stessa regola (01/10/2026) — vedi GRAMMATURA_G.
+    "VP08": {"WP40": 100},
 }
 
 # sku: {formato: (pezzi, peso_g)} — peso ricalcolato dalla formula sopra,
