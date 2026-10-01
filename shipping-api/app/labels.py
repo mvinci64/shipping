@@ -137,22 +137,47 @@ def make_inner_labels_pdf(
         # quantità per componente invece del blocco a SKU singolo qui sotto.
         # Niente barcode: non c'è un solo GTIN da rappresentare.
         if item.get("componenti"):
-            c.setFont("Helvetica-Bold", 14)
-            c.drawString(margine, y, f"Collo misto ({item['formato']})")
-            y -= 9 * mm
-            for comp in item["componenti"]:
-                nome_comp = (nomi_prodotto or {}).get(comp["sku"])
-                riga = f"{comp['sku']} — {nome_comp}" if nome_comp else comp["sku"]
-                # font più piccolo + a capo (righe_max=2) invece di troncare
-                # con "…": il nome esatto del prodotto (es. il sapore) è
-                # l'informazione che conta di più su un collo misto.
-                c.setFont("Helvetica-Bold", 13)
-                for sotto_riga in _a_capo(c, riga, "Helvetica-Bold", 13, larghezza_utile, righe_max=2):
-                    c.drawString(margine, y, sotto_riga)
-                    y -= 5.8 * mm
-                c.setFont("Helvetica-Bold", 20)
+            componenti = item["componenti"]
+            c.setFont("Helvetica-Bold", 11)
+            # formato None: gruppo sfuso a scatolone forzato (vedi
+            # cartonize.collo_misto_box, 01/10/2026) — niente scatola
+            # interna, "Collo misto (WP40)" non avrebbe senso qui.
+            titolo = f"Collo misto ({item['formato']})" if item["formato"] else "Sfuso"
+            c.drawString(margine, y, titolo)
+            y -= 7 * mm
+
+            # Font e interlinea dei componenti scelti dinamicamente in base
+            # al numero di sapori nel collo: con un font fisso (13pt nome +
+            # 20pt pezzi) un collo a 4-5 componenti sforava il fondo pagina
+            # (100mm) — caso reale ORD-20260924-6100 (01/10/2026), 5 paste
+            # di mandorla in un solo WP40. Si prova dal font più grande
+            # finché il totale non entra nello spazio rimasto; il nome
+            # resta a capo su 2 righe al massimo (mai troncato con "…":
+            # il sapore esatto è l'informazione che conta di più qui).
+            margine_inferiore = 8 * mm
+            budget_mm = (y - margine_inferiore) / mm
+            nomi_componenti = [
+                (f"{comp['sku']} — {nomi_prodotto[comp['sku']]}" if (nomi_prodotto or {}).get(comp["sku"]) else comp["sku"])
+                for comp in componenti
+            ]
+            for font_size in (13, 12, 11, 10, 9, 8, 7):
+                line_h = font_size * 0.42
+                blocco_h = font_size * 0.6
+                righe_per_componente = [
+                    _a_capo(c, nome, "Helvetica-Bold", font_size, larghezza_utile, righe_max=2)
+                    for nome in nomi_componenti
+                ]
+                totale_mm = sum(len(righe) * line_h + blocco_h + 1.5 for righe in righe_per_componente)
+                if totale_mm <= budget_mm or font_size == 7:
+                    break
+
+            for comp, righe in zip(componenti, righe_per_componente):
+                c.setFont("Helvetica-Bold", font_size)
+                for riga in righe:
+                    c.drawString(margine, y, riga)
+                    y -= line_h * mm
                 c.drawString(margine + 4 * mm, y, f"{comp['pezzi']} pz")
-                y -= 9 * mm
+                y -= (blocco_h + 1.5) * mm
             c.showPage()
             continue
 
@@ -329,7 +354,11 @@ def make_carton_summary_labels_pdf(
             # stessa scatola interna — vedi cartonize.collo_misto_box.
             if item.get("componenti"):
                 contenuto_misto = " + ".join(f"{comp['pezzi']}× {comp['sku']}" for comp in item["componenti"])
-                descrizione = f"1× {item['formato']}  {contenuto_misto}"
+                # formato None: gruppo sfuso a scatolone forzato (vedi
+                # cartonize.collo_misto_box, 01/10/2026) — niente scatola
+                # interna da mostrare, stessa dicitura "(sfuso)" degli SKU
+                # sfusi singoli.
+                descrizione = f"1× {item['formato']}  {contenuto_misto}" if item["formato"] else f"{contenuto_misto}  (sfuso)"
             elif item["formato"]:
                 descrizione = f"1× {item['formato']}  {item['sku']}  ({item['pezzi']} pz)"
             else:

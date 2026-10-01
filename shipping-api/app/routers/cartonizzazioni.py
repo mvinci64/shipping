@@ -256,15 +256,21 @@ def rimuovi_collo_omaggio(collo_id: str) -> None:
 
 
 class RichiestaColloMisto(BaseModel):
-    formato: str  # "WP50" | "WP40"
+    # None = gruppo sfuso a scatolone forzato (vedi
+    # sql/colli_misti_manuali_sfuso_indice.sql, 01/10/2026) — richiede
+    # scatolone_indice. "WP50"/"WP40" = collo misto normale (scatola
+    # interna), scatolone_indice non si applica.
+    formato: str | None = None
     componenti: list[ComponenteCollo]
+    scatolone_indice: int | None = None
 
 
 class ColloMisto(BaseModel):
     id: str
     order_number: str
-    formato: str
+    formato: str | None
     contenuto: list[ComponenteCollo]
+    scatolone_indice: int | None = None
 
 
 @router.post("/cartonizzazioni/{order_number}/colli-misti", response_model=ColloMisto)
@@ -274,12 +280,27 @@ def aggiungi_collo_misto(order_number: str, richiesta: RichiestaColloMisto) -> C
     vedi cartonize.SFUSO_SKUS/GRAMMATURA_G e sql/colli_misti_manuali.sql.
     Le quantità dei componenti sono validate contro le righe reali
     dell'ordine (non possono superare quanto ordinato, sommato agli altri
-    colli misti già registrati) prima di salvare."""
-    if richiesta.formato not in ("WP50", "WP40"):
-        raise HTTPException(status_code=422, detail="formato deve essere 'WP50' o 'WP40'")
+    colli misti già registrati) prima di salvare.
+
+    formato=None richiede scatolone_indice valorizzato: registra un gruppo
+    sfuso (niente scatola interna) piazzato a mano in quello scatolone del
+    risultato automatico — caso reale ORD-20260924-6100 (01/10/2026), torte
+    caprese spostate in uno scatolone che l'algoritmo considererebbe
+    "pieno" per posti, ma che il reparto ha verificato entrarci fisicamente.
+    Vedi cartonize.cartonize_order e sql/colli_misti_manuali_sfuso_indice.sql."""
+    if richiesta.formato not in ("WP50", "WP40", None):
+        raise HTTPException(status_code=422, detail="formato deve essere 'WP50', 'WP40' o assente (gruppo sfuso)")
+    if richiesta.formato is None and not richiesta.scatolone_indice:
+        raise HTTPException(status_code=422, detail="scatolone_indice obbligatorio per un gruppo sfuso (formato assente)")
+    if richiesta.formato is not None and richiesta.scatolone_indice:
+        raise HTTPException(status_code=422, detail="scatolone_indice si applica solo ai gruppi sfusi (formato assente)")
     ordine = _ordine_reale(order_number)
     esistenti = db.fetch_colli_misti_per_cartonize(order_number) or []
-    nuovo = {"formato": richiesta.formato, "componenti": [c.model_dump() for c in richiesta.componenti]}
+    nuovo = {
+        "formato": richiesta.formato,
+        "componenti": [c.model_dump() for c in richiesta.componenti],
+        "scatolone_indice": richiesta.scatolone_indice,
+    }
     try:
         cartonize_order(ordine["righe"], colli_misti=esistenti + [nuovo])
     except ValueError as exc:
@@ -287,7 +308,7 @@ def aggiungi_collo_misto(order_number: str, richiesta: RichiestaColloMisto) -> C
     except KeyError as exc:
         raise HTTPException(status_code=422, detail=f"Peso non censito per SKU {exc}") from exc
 
-    creato = db.aggiungi_collo_misto(order_number, richiesta.formato, nuovo["componenti"])
+    creato = db.aggiungi_collo_misto(order_number, richiesta.formato, nuovo["componenti"], richiesta.scatolone_indice)
     return ColloMisto(**creato)
 
 

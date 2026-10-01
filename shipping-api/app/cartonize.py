@@ -183,14 +183,22 @@ def pack_cartons(boxes):
     return cartons
 
 
-def collo_misto_box(formato: str, componenti: list[dict]) -> tuple:
+def collo_misto_box(formato: str | None, componenti: list[dict]) -> tuple:
     """Costruisce un box 'misto' pronto per pack_cartons: più SKU nella
     stessa scatola interna, peso somma dei componenti (stessa formula di
     _peso_collo_g). componenti: [{"sku": ..., "pezzi": ...}, ...]. Ogni sku
     deve avere un peso noto in GRAMMATURA_G — KeyError esplicito altrimenti
-    (niente peso indovinato per una spedizione DHL reale)."""
+    (niente peso indovinato per una spedizione DHL reale).
+
+    formato=None: gruppo SFUSO (niente scatola interna, niente tara, zero
+    posti occupati — stesso trattamento di SFUSO_SKUS), per un collo misto
+    "a scatolone forzato" (vedi sql/colli_misti_manuali_sfuso_indice.sql,
+    01/10/2026): un gruppo di pezzi sfusi che l'operatore vuole piazzare in
+    uno scatolone specifico invece di lasciarlo alla cartonizzazione
+    automatica."""
     peso = sum(c["pezzi"] * (GRAMMATURA_G[c["sku"]] + SOVRAPPESO_CONFEZIONE_G) for c in componenti)
-    peso += TARA_COLLO_G[formato]
+    if formato is not None:
+        peso += TARA_COLLO_G[formato]
     pezzi_totali = sum(c["pezzi"] for c in componenti)
     return (formato, None, pezzi_totali, peso, componenti)
 
@@ -236,10 +244,29 @@ def cartonize_order(rows, colli_misti: list[dict] | None = None):
         else:
             boxes += [(fmt, sku, pezzi, peso) for fmt, pezzi, peso in line_boxes]
 
+    # Gruppi sfusi "a scatolone forzato" (formato None + scatolone_indice):
+    # non entrano nel first-fit automatico di pack_cartons, vengono inseriti
+    # a colpo sicuro nello scatolone indicato dall'operatore DOPO che gli
+    # altri colli (automatici + misti normali) hanno già determinato quanti
+    # scatoloni servono — l'operatore ha verificato fisicamente che ci
+    # stanno, anche se l'algoritmo li considererebbe "pieni" per posti.
+    colli_misti_forzati = [cm for cm in colli_misti if cm.get("formato") is None and cm.get("scatolone_indice")]
     for cm in colli_misti:
-        boxes.append(collo_misto_box(cm["formato"], cm["componenti"]))
+        if cm not in colli_misti_forzati:
+            boxes.append(collo_misto_box(cm["formato"], cm["componenti"]))
 
     cartons = pack_cartons(boxes)
+
+    for cm in colli_misti_forzati:
+        indice = cm["scatolone_indice"] - 1
+        while len(cartons) <= indice:
+            cartons.append({"posti_usati": 0, "contenuto": [], "peso_g": TARA_SCATOLONE_G + CARTA_RIEMPIMENTO_G})
+        _, _, pezzi_totali, peso, componenti = collo_misto_box(None, cm["componenti"])
+        cartons[indice]["contenuto"].append(
+            {"formato": None, "sku": None, "pezzi": pezzi_totali, "peso_g": peso, "componenti": componenti}
+        )
+        cartons[indice]["peso_g"] += peso
+
     return {
         "scatoloni": cartons,
         "n_scatoloni": len(cartons),

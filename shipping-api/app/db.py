@@ -593,22 +593,33 @@ def revoke_session(token: str) -> None:
         conn.commit()
 
 
-def aggiungi_collo_misto(order_number: str, formato: str, contenuto: list[dict]) -> dict:
+def aggiungi_collo_misto(
+    order_number: str, formato: str | None, contenuto: list[dict], scatolone_indice: int | None = None
+) -> dict:
     """Registra un collo misto (più SKU nella stessa scatola interna,
     decisi a mano dal reparto — vedi sql/colli_misti_manuali.sql).
-    contenuto: [{"sku": ..., "pezzi": ...}, ...]."""
+    contenuto: [{"sku": ..., "pezzi": ...}, ...].
+
+    formato=None + scatolone_indice: gruppo sfuso a scatolone forzato (vedi
+    sql/colli_misti_manuali_sfuso_indice.sql, 01/10/2026) — pezzi senza
+    scatola interna che l'operatore vuole piazzare in uno scatolone
+    specifico del risultato, invece di lasciarli alla cartonizzazione
+    automatica."""
     with get_connection() as conn:
         row = conn.execute(
             """
-            INSERT INTO viscotta.colli_misti_manuali (order_number, formato, contenuto)
-            VALUES (%s, %s, %s)
-            RETURNING id, order_number, formato, contenuto
+            INSERT INTO viscotta.colli_misti_manuali (order_number, formato, contenuto, scatolone_indice)
+            VALUES (%s, %s, %s, %s)
+            RETURNING id, order_number, formato, contenuto, scatolone_indice
             """,
-            (order_number, formato, Jsonb(contenuto)),
+            (order_number, formato, Jsonb(contenuto), scatolone_indice),
         ).fetchone()
         conn.commit()
-    id_, order_number, formato, contenuto = row
-    return {"id": str(id_), "order_number": order_number, "formato": formato, "contenuto": contenuto}
+    id_, order_number, formato, contenuto, scatolone_indice = row
+    return {
+        "id": str(id_), "order_number": order_number, "formato": formato,
+        "contenuto": contenuto, "scatolone_indice": scatolone_indice,
+    }
 
 
 def fetch_colli_misti(order_number: str) -> list[dict]:
@@ -617,13 +628,16 @@ def fetch_colli_misti(order_number: str) -> list[dict]:
     with get_connection() as conn:
         rows = conn.execute(
             """
-            SELECT id, formato, contenuto FROM viscotta.colli_misti_manuali
+            SELECT id, formato, contenuto, scatolone_indice FROM viscotta.colli_misti_manuali
             WHERE order_number = %s
             ORDER BY creata_at
             """,
             (order_number,),
         ).fetchall()
-    return [{"id": str(id_), "formato": formato, "contenuto": contenuto} for id_, formato, contenuto in rows]
+    return [
+        {"id": str(id_), "formato": formato, "contenuto": contenuto, "scatolone_indice": scatolone_indice}
+        for id_, formato, contenuto, scatolone_indice in rows
+    ]
 
 
 def elimina_collo_misto(collo_id: str) -> bool:
@@ -637,7 +651,7 @@ def fetch_colli_misti_per_cartonize(order_number: str) -> list[dict] | None:
     """fetch_colli_misti già nel formato atteso da cartonize_order(...,
     colli_misti=...) — None se non ce ne sono, per passarlo direttamente."""
     colli_misti = [
-        {"formato": cm["formato"], "componenti": cm["contenuto"]}
+        {"formato": cm["formato"], "componenti": cm["contenuto"], "scatolone_indice": cm["scatolone_indice"]}
         for cm in fetch_colli_misti(order_number)
     ]
     return colli_misti or None
