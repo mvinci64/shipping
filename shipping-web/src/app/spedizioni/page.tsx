@@ -39,6 +39,9 @@ export default async function Spedizioni({
             </p>
           </div>
           <div className="flex items-center gap-4">
+            <Link href="/spedizioni/cartellone" className="text-sm text-zinc-500 hover:underline dark:text-zinc-400">
+              Cartellone
+            </Link>
             <Link href="/spedizioni/tracking" className="text-sm text-zinc-500 hover:underline dark:text-zinc-400">
               Tracking
             </Link>
