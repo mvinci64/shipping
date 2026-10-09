@@ -65,6 +65,10 @@ function formattaIntestazione(iso: string): { data: string; giorno: string } {
   };
 }
 
+function formattaDataBreve(iso: string): string {
+  return new Date(iso + "T00:00:00").toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" });
+}
+
 function Zona({ titolo, data, righe }: { titolo: string; data: string; righe: Riga[] }) {
   return (
     <div className="flex flex-1 flex-col">
@@ -93,7 +97,10 @@ function Zona({ titolo, data, righe }: { titolo: string; data: string; righe: Ri
               <div className="h-5 w-5 flex-none border-2 border-zinc-900 dark:border-zinc-100" />
               <div className="w-6 flex-none text-right font-mono text-sm text-zinc-500">{i + 1}</div>
               <div className="flex-1 text-xl font-semibold text-zinc-900 dark:text-zinc-50">{r.cliente}</div>
-              <div className="flex-none font-mono text-xs text-zinc-500">{r.order_number}</div>
+              <div className="flex-none text-right font-mono text-xs text-zinc-500">
+                <div>{r.order_number}</div>
+                <div>consegna {r.data_consegna ? formattaDataBreve(r.data_consegna) : "—"}</div>
+              </div>
             </div>
           ))
         )}
