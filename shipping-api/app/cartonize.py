@@ -60,6 +60,18 @@ GRAMMATURA_G = {
     # trattato come sfuso (etichetta generica, come le Torte da 500) su
     # richiesta dell'utente 27/09/2026, peso confermato a parte (320 g/pz).
     "SCAT20V16": 320,
+    # CIOCCM40SC (Barretta di Cioc Fondente, 40g a pezzo come da codice) e
+    # MGUS500 (Mandorle Pizzuta d'Avola con Guscio, 500g a confezione,
+    # stessa convenzione delle scatole regalo/Natale sopra) — censiti
+    # dall'utente 04/10/2026 per i primi colli misti reali su ORD-20260611-1104
+    # (CAPSULA CAFFE') e ORD-20260720-2056 (NERO 65). CIOCCM80SC, stessa
+    # famiglia di barrette, formato da 80g — stessa regola (numero nel
+    # codice = grammi a pezzo), confermata dall'utente lo stesso giorno.
+    "CIOCCM40SC": 40, "MGUS500": 500, "CIOCCM80SC": 80,
+    # VP09/VP10, nuove paste di mandorla — NON la stessa grammatura delle
+    # altre (20g): confermato dall'utente 07/10/2026 a 25g/pz, primo ordine
+    # reale IMPORT-DMLAB-20260617-01-B (DROGHERIA CIRLA).
+    "VP09": 25, "VP10": 25,
 }
 
 # SKU "sfusi": niente scatola interna WP40/WP50, i pezzi riempiono
@@ -93,6 +105,11 @@ PEZZI_PER_COLLO = {
     "CANTS100":  {"WP50": 24, "WP40": 12},
     "CMEN080":   {"WP50": 24, "WP40": 12},
     "MCIOC080":  {"WP50": 24, "WP40": 12},
+    # CIOCCM80SC (Barretta di Cioc Fondente 80g) — stesso forfait 24/12 dei
+    # prodotti standard da 80g (CMEN080/MCIOC080), confermato dall'utente
+    # 13/10/2026 sul primo ordine reale con questo SKU (UNIGROUP,
+    # ORD-20260928-3067, 24 pz → 1 WP50 pieno).
+    "CIOCCM80SC": {"WP50": 24, "WP40": 12},
     # MSAL080 entra più fitto degli altri prodotti da 80g: capacità propria,
     # non il forfait 24/12 condiviso col resto del gruppo — confermato
     # dall'utente 09/09/2026 (36 pezzi pieni un WP50, 24 pieni un WP40).
