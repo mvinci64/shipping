@@ -131,16 +131,17 @@ PEZZI_PER_COLLO = {
     "CHMS1KG":   {"WP50": 2, "WP40": 1},
     "CANTS1KG":  {"WP50": 2, "WP40": 1},
     "GRM1KG":    {"WP50": 2, "WP40": 1},
-    # Pasta di mandorla singola (VP01/VP02/VP04/VP05/VP06, 20 g/pz — vedi
-    # GRAMMATURA_G): configurazione standard confermata dall'utente
-    # 27/09/2026, 100 pz per WP40 (niente WP50). Prima gestita solo via
-    # collo misto manuale (sql/colli_misti_manuali.sql); resta comunque
-    # possibile registrare un collo misto quando in un WP40 vanno mescolati
-    # più sapori invece di un solo SKU da 100 pezzi.
-    "VP01": {"WP40": 100}, "VP02": {"WP40": 100}, "VP04": {"WP40": 100},
-    "VP05": {"WP40": 100}, "VP06": {"WP40": 100},
-    # VP08, stessa regola (01/10/2026) — vedi GRAMMATURA_G.
-    "VP08": {"WP40": 100},
+    # Pasta di mandorla singola (VP01/VP02/VP04/VP05/VP06/VP08/VP09/VP10):
+    # capacità aggiornata dall'utente 19/10/2026 a 50 pz/WP40, 100 pz/WP50
+    # per tutta la famiglia VPnn (prima solo 100 pz/WP40, niente WP50 —
+    # vedi ORD-20260611-1104/ORD-20260720-2056 per i primi colli misti
+    # manuali pre-censimento). Resta comunque possibile registrare un
+    # collo misto quando in uno stesso WP40/WP50 vanno mescolati più
+    # sapori invece di un solo SKU.
+    "VP01": {"WP50": 100, "WP40": 50}, "VP02": {"WP50": 100, "WP40": 50},
+    "VP04": {"WP50": 100, "WP40": 50}, "VP05": {"WP50": 100, "WP40": 50},
+    "VP06": {"WP50": 100, "WP40": 50}, "VP08": {"WP50": 100, "WP40": 50},
+    "VP09": {"WP50": 100, "WP40": 50}, "VP10": {"WP50": 100, "WP40": 50},
 }
 
 # sku: {formato: (pezzi, peso_g)} — peso ricalcolato dalla formula sopra,
