@@ -110,6 +110,10 @@ PEZZI_PER_COLLO = {
     # 13/10/2026 sul primo ordine reale con questo SKU (UNIGROUP,
     # ORD-20260928-3067, 24 pz → 1 WP50 pieno).
     "CIOCCM80SC": {"WP50": 24, "WP40": 12},
+    # CIOCCM40SC (Barretta di Cioc Fondente 40g) — capacità propria,
+    # confermata dall'utente 19/10/2026 sul primo ordine reale con questo
+    # SKU (STREGATE TEA SHOP, ORD-20260613-9021, 36 pz → 1 WP50 pieno).
+    "CIOCCM40SC": {"WP50": 36, "WP40": 24},
     # MSAL080 entra più fitto degli altri prodotti da 80g: capacità propria,
     # non il forfait 24/12 condiviso col resto del gruppo — confermato
     # dall'utente 09/09/2026 (36 pezzi pieni un WP50, 24 pieni un WP40).
