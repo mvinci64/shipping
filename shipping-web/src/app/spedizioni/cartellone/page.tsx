@@ -69,7 +69,31 @@ function formattaDataBreve(iso: string): string {
   return new Date(iso + "T00:00:00").toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" });
 }
 
+// Un invio = un cliente, una partenza. Più ordini dello stesso cliente che
+// partono lo stesso giorno sono UN SOLO invio per il reparto (un collo, un
+// ritiro): il cartellone li raggruppa su una riga sola, così il laboratorio
+// non prepara due spedizioni separate per lo stesso destinatario. Nel resto
+// del sistema le spedizioni restano 1:1 con gli ordini (vedi CLAUDE.md):
+// questo raggruppamento è solo la vista di reparto.
+type Invio = { cliente: string; ordini: Riga[] };
+
+function raggruppaPerCliente(righe: Riga[]): Invio[] {
+  const perCliente = new Map<string, Riga[]>();
+  for (const r of righe) {
+    const esistenti = perCliente.get(r.cliente);
+    if (esistenti) esistenti.push(r);
+    else perCliente.set(r.cliente, [r]);
+  }
+  return [...perCliente].map(([cliente, ordini]) => ({ cliente, ordini }));
+}
+
 function Zona({ titolo, data, righe }: { titolo: string; data: string; righe: Riga[] }) {
+  const invii = raggruppaPerCliente(righe);
+  const conteggio =
+    invii.length === righe.length
+      ? `${invii.length} ${invii.length === 1 ? "invio" : "invii"}`
+      : `${invii.length} invii · ${righe.length} ordini`;
+
   return (
     <div className="flex flex-1 flex-col">
       <div className="mb-3 flex items-baseline gap-4 border-2 border-zinc-900 bg-amber-100 px-4 py-1.5 dark:border-zinc-100 dark:bg-amber-950">
@@ -79,27 +103,35 @@ function Zona({ titolo, data, righe }: { titolo: string; data: string; righe: Ri
         <span className="text-sm font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-400">
           {data} — in partenza
         </span>
-        <span className="ml-auto font-mono text-sm text-zinc-600 dark:text-zinc-400">
-          {righe.length} {righe.length === 1 ? "ordine" : "ordini"}
-        </span>
+        <span className="ml-auto font-mono text-sm text-zinc-600 dark:text-zinc-400">{conteggio}</span>
       </div>
       <div className="flex-1 border-t-2 border-zinc-900 dark:border-zinc-100">
-        {righe.length === 0 ? (
+        {invii.length === 0 ? (
           <div className="flex items-center justify-center border-b-2 border-zinc-900 py-6 text-sm italic text-zinc-500 dark:border-zinc-100 dark:text-zinc-400">
             — nessun ordine in partenza questo giorno —
           </div>
         ) : (
-          righe.map((r, i) => (
+          invii.map((invio, i) => (
             <div
-              key={r.order_number}
+              key={invio.cliente}
               className="flex items-center gap-4 border-b border-zinc-400 py-2 dark:border-zinc-700"
             >
               <div className="h-5 w-5 flex-none border-2 border-zinc-900 dark:border-zinc-100" />
               <div className="w-6 flex-none text-right font-mono text-sm text-zinc-500">{i + 1}</div>
-              <div className="flex-1 text-xl font-semibold text-zinc-900 dark:text-zinc-50">{r.cliente}</div>
+              <div className="flex-1">
+                <div className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">{invio.cliente}</div>
+                {invio.ordini.length > 1 && (
+                  <div className="text-sm font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-500">
+                    {invio.ordini.length} ordini in un solo invio
+                  </div>
+                )}
+              </div>
               <div className="flex-none text-right font-mono text-xs text-zinc-500">
-                <div>{r.order_number}</div>
-                <div>consegna {r.data_consegna ? formattaDataBreve(r.data_consegna) : "—"}</div>
+                {invio.ordini.map((o) => (
+                  <div key={o.order_number}>
+                    {o.order_number} · consegna {o.data_consegna ? formattaDataBreve(o.data_consegna) : "—"}
+                  </div>
+                ))}
               </div>
             </div>
           ))
