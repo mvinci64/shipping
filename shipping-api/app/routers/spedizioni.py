@@ -14,6 +14,10 @@ router = APIRouter()
 class SpedizioneResponse(BaseModel):
     id: str
     order_number: str
+    # Altri ordini dello stesso destinatario consolidati in questa unica
+    # spedizione DHL (vuoto per le spedizioni a ordine singolo, che
+    # restano il caso normale) — vedi sql/spedizioni_consolidate.sql.
+    ordini_aggregati: list[str] = []
     corriere: str
     stato: str
     product_code: str | None
@@ -204,19 +208,158 @@ def valida_spedizione(order_number: str) -> dict:
     }
 
 
+def _valida_consolidamento(capofila: str, ordini_aggregati: list[str]) -> None:
+    """Controlli obbligatori prima di consolidare più ordini in un'unica
+    spedizione DHL (vedi sql/spedizioni_consolidate.sql). Solleva 409/422
+    se il consolidamento non è lecito: una spedizione unica significa UNA
+    etichetta, UN indirizzo e UN ritiro, quindi gli ordini devono essere
+    dello stesso cliente e partire insieme."""
+    if len(set(ordini_aggregati)) != len(ordini_aggregati):
+        raise HTTPException(status_code=422, detail="ordini_aggregati contiene duplicati")
+    if capofila in ordini_aggregati:
+        raise HTTPException(
+            status_code=422,
+            detail=f"L'ordine capofila {capofila} non va ripetuto in ordini_aggregati",
+        )
+
+    tutti = [capofila, *ordini_aggregati]
+    dati = db.fetch_dati_consolidamento(tutti)
+    trovati = {d["order_number"] for d in dati}
+    mancanti = [o for o in tutti if o not in trovati]
+    if mancanti:
+        raise HTTPException(status_code=404, detail=f"Ordini non trovati: {', '.join(mancanti)}")
+
+    # Stesso cliente: si confronta customer_id, non il nome azienda —
+    # vedi db.fetch_dati_consolidamento per il perché.
+    clienti = {d["customer_id"] for d in dati}
+    if len(clienti) > 1:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "Gli ordini da consolidare non sono dello stesso cliente: una spedizione "
+                "unica ha un solo destinatario. Ordini: "
+                + ", ".join(f"{d['order_number']} (cliente {d['customer_id']})" for d in dati)
+            ),
+        )
+
+    date = {d["data_consegna"] for d in dati}
+    if len(date) > 1:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "Gli ordini da consolidare hanno date di consegna diverse ("
+                + ", ".join(f"{d['order_number']}: {d['data_consegna']}" for d in dati)
+                + "): una spedizione unica parte in un solo giorno"
+            ),
+        )
+
+    # Un ordine già in viaggio (o con una bozza aperta) non può essere
+    # assorbito in una nuova spedizione: si pagherebbe due volte lo stesso
+    # ordine, o si lascerebbe una bozza orfana.
+    for ordine_numero in tutti:
+        esistente = db.fetch_ultima_spedizione_per_ordine(ordine_numero)
+        if esistente is not None and esistente["stato"] in ("bozza", "confermata", "ritirata"):
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"L'ordine {ordine_numero} ha già una spedizione in stato "
+                    f"'{esistente['stato']}' (id {esistente['id']}): annullarla prima di "
+                    "consolidarlo in una nuova spedizione"
+                ),
+            )
+
+
+def _pesi_e_riferimenti(ordini: list[str]) -> tuple[list[float], list[str]]:
+    """Pesi di tutti gli scatoloni degli ordini indicati, con accanto
+    l'ordine di appartenenza di ciascun collo (liste parallele). Per una
+    spedizione consolidata i colli dei vari ordini restano colli distinti:
+    non si rimescola la cartonizzazione, si somma solo ciò che parte
+    insieme — così ogni collo può portare il riferimento del proprio
+    ordine sull'etichetta DHL (vedi dhl.crea_spedizione)."""
+    pesi: list[float] = []
+    riferimenti: list[str] = []
+    for order_number in ordini:
+        ordine = db.fetch_order(order_number)
+        if ordine is None:
+            raise HTTPException(status_code=404, detail=f"Ordine {order_number} non trovato")
+        pesi_ordine = _pesi_scatoloni_kg(order_number, ordine)
+        pesi += pesi_ordine
+        riferimenti += [order_number] * len(pesi_ordine)
+    return pesi, riferimenti
+
+
+def _contrassegno_totale(ordini: list[str]) -> float | None:
+    """Contrassegno complessivo di una spedizione: somma degli importi
+    degli ordini che lo prevedono, None se sono tutti già pagati. Il
+    corriere riscuote una volta sola alla consegna, quindi su una
+    spedizione consolidata deve riscuotere il TOTALE — chiedere solo
+    l'importo del capofila significherebbe consegnare merce non pagata."""
+    importi = []
+    for order_number in ordini:
+        ordine = db.fetch_order(order_number)
+        if ordine is None:
+            raise HTTPException(status_code=404, detail=f"Ordine {order_number} non trovato")
+        importo = _contrassegno_eur(order_number, ordine)
+        if importo is not None:
+            importi.append(importo)
+    return round(sum(importi), 2) if importi else None
+
+
 @router.post("/spedizioni", response_model=SpedizioneResponse)
-def crea_bozza_spedizione(order_number: str) -> SpedizioneResponse:
+def crea_bozza_spedizione(
+    order_number: str, ordini_aggregati: list[str] | None = None,
+) -> SpedizioneResponse:
     """Crea la bozza (stato 'bozza'): quota via /rates e salva su DB.
-    Nessuna chiamata DHL con effetto reale — solo /rates, come /valida."""
+    Nessuna chiamata DHL con effetto reale — solo /rates, come /valida.
+
+    ordini_aggregati: altri ordini dello STESSO cliente e con la STESSA
+    data di consegna da spedire in un'unica spedizione DHL (un collo
+    fisico, un'etichetta, un ritiro) — caso reale STREGATE TEA SHOP con
+    due ordini separati, 21/10/2026. order_number fa da capofila; pesi e
+    contrassegno della bozza sono quelli di tutti gli ordini insieme.
+    Vedi _valida_consolidamento per i controlli applicati."""
+    aggregati = ordini_aggregati or []
+    if aggregati:
+        _valida_consolidamento(order_number, aggregati)
+
     ordine, destinatario = _ordine_e_destinatario(order_number)
-    pesi_kg = _pesi_scatoloni_kg(order_number, ordine)
+    tutti_gli_ordini = [order_number, *aggregati]
+    pesi_kg, _riferimenti = _pesi_e_riferimenti(tutti_gli_ordini)
     risposta_dhl = _quota(destinatario, pesi_kg, _prossima_data_spedizione())
     product_code, prezzo = _scegli_prodotto(risposta_dhl)
     bozza = db.crea_spedizione_bozza(
         order_number=order_number, corriere="dhl", product_code=product_code,
         pesi_scatoloni_kg=pesi_kg, prezzo_stimato_eur=prezzo,
+        ordini_aggregati=aggregati,
     )
-    return SpedizioneResponse(**bozza, contrassegno_eur=_contrassegno_eur(order_number, ordine))
+    return SpedizioneResponse(**bozza, contrassegno_eur=_contrassegno_totale(tutti_gli_ordini))
+
+
+class OrdineConsolidabile(BaseModel):
+    order_number: str
+    data_consegna: str | None
+    n_colli: int
+
+
+@router.get("/spedizioni/consolidabili/{order_number}", response_model=list[OrdineConsolidabile])
+def ordini_consolidabili(order_number: str) -> list[OrdineConsolidabile]:
+    """Altri ordini che si possono spedire nella stessa spedizione DHL di
+    questo (stesso cliente, stessa data di consegna, nessuna spedizione
+    già aperta) — vedi POST /spedizioni con ordini_aggregati. Lista vuota
+    nel caso normale di un cliente con un solo ordine in partenza.
+    Sola lettura, nessun effetto."""
+    risultato = []
+    for candidato in db.fetch_ordini_consolidabili(order_number):
+        ordine = db.fetch_order(candidato["order_number"])
+        if ordine is None:
+            continue
+        cartonizzazione = _cartonize_ordine_reale(candidato["order_number"], ordine["righe"])
+        risultato.append(OrdineConsolidabile(
+            order_number=candidato["order_number"],
+            data_consegna=candidato["data_consegna"],
+            n_colli=cartonizzazione["n_scatoloni"],
+        ))
+    return risultato
 
 
 class RigaElenco(BaseModel):
@@ -228,6 +371,11 @@ class RigaElenco(BaseModel):
     colli_completo: bool
     spedizione_stato: str  # 'non_iniziata' | 'bozza' | 'confermata' | 'ritirata' | 'fallita'
     spedizione_id: str | None
+    # Valorizzato solo se questo ordine viaggia in una spedizione
+    # CONSOLIDATA di cui NON è il capofila: contiene il numero d'ordine
+    # capofila, così il reparto vede che la merce parte già (sotto
+    # un'altra spedizione) invece di credere che manchi.
+    spedizione_capofila: str | None = None
 
 
 @router.get("/spedizioni/elenco", response_model=list[RigaElenco])
@@ -260,6 +408,11 @@ def elenco_spedizioni(
             colli_completo=n_colli > 0 and len(confermati) >= n_colli,
             spedizione_stato=spedizione["stato"] if spedizione else "non_iniziata",
             spedizione_id=spedizione["id"] if spedizione else None,
+            spedizione_capofila=(
+                spedizione["order_number"]
+                if spedizione and spedizione["order_number"] != ordine["order_number"]
+                else None
+            ),
         ))
     return righe
 
@@ -318,8 +471,14 @@ def tracking_spedizioni(
 
 
 def _con_contrassegno(spedizione: dict) -> SpedizioneResponse:
-    ordine = db.fetch_order(spedizione["order_number"])
-    return SpedizioneResponse(**spedizione, contrassegno_eur=_contrassegno_eur(spedizione["order_number"], ordine))
+    """Contrassegno da mostrare per una spedizione già esistente: il
+    TOTALE di tutti i suoi ordini, così una spedizione consolidata non
+    espone l'importo del solo capofila (l'operatore lo leggerebbe come
+    cifra da riscuotere, ed è quella sbagliata)."""
+    return SpedizioneResponse(
+        **spedizione,
+        contrassegno_eur=_contrassegno_totale(db.ordini_di_spedizione(spedizione)),
+    )
 
 
 @router.get("/spedizioni/per-ordine/{order_number}", response_model=SpedizioneResponse | None)
@@ -363,16 +522,22 @@ def conferma_spedizione(spedizione_id: str) -> SpedizioneResponse:
             status_code=409, detail=f"Spedizione in stato '{spedizione['stato']}', non 'bozza'/'fallita'"
         )
 
-    stato_colli = _stato_colli(spedizione["order_number"])
-    if not stato_colli.completo:
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                f"Colli non ancora tutti confermati a fine linea per l'ordine "
-                f"{spedizione['order_number']}: mancano {stato_colli.mancanti} "
-                f"su {stato_colli.n_totale} (vedi GET /cartonizzazioni/{spedizione['order_number']}/colli)"
-            ),
-        )
+    # Il gate vale per OGNI ordine della spedizione, non solo per il
+    # capofila: su una spedizione consolidata basterebbe altrimenti avere
+    # i colli del capofila pronti per far partire (costo e ritiro reali)
+    # una spedizione a cui manca ancora la merce del secondo ordine.
+    ordini_spedizione = db.ordini_di_spedizione(spedizione)
+    for ordine_numero in ordini_spedizione:
+        stato_colli = _stato_colli(ordine_numero)
+        if not stato_colli.completo:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"Colli non ancora tutti confermati a fine linea per l'ordine "
+                    f"{ordine_numero}: mancano {stato_colli.mancanti} "
+                    f"su {stato_colli.n_totale} (vedi GET /cartonizzazioni/{ordine_numero}/colli)"
+                ),
+            )
 
     ordine, destinatario = _ordine_e_destinatario(spedizione["order_number"])
     if not _indirizzo_spedizione(destinatario["indirizzo"]):
@@ -384,6 +549,25 @@ def conferma_spedizione(spedizione_id: str) -> SpedizioneResponse:
                 "va aggiunto a mano prima di poter confermare"
             ),
         )
+
+    # I riferimenti per collo vanno ricalcolati dalla cartonizzazione di
+    # adesso, ma i pesi su cui si è quotato (e che DHL fatturerà) sono
+    # quelli salvati sulla bozza: se nel frattempo la cartonizzazione è
+    # cambiata (un collo misto registrato dopo la bozza, una capacità SKU
+    # censita nel frattempo) le due cose non combaciano più e l'etichetta
+    # riporterebbe riferimenti sbagliati. Meglio fermarsi e far ricreare
+    # la bozza che emettere una spedizione reale incoerente.
+    pesi_ora, riferimenti_colli = _pesi_e_riferimenti(ordini_spedizione)
+    if pesi_ora != [float(p) for p in spedizione["pesi_scatoloni_kg"]]:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "La cartonizzazione è cambiata dopo la creazione della bozza "
+                f"(bozza: {spedizione['pesi_scatoloni_kg']} kg, adesso: {pesi_ora} kg): "
+                "annullare questa bozza e ricrearla prima di confermare"
+            ),
+        )
+
     try:
         risposta = dhl.crea_spedizione(
             order_number=spedizione["order_number"],
@@ -398,7 +582,13 @@ def conferma_spedizione(spedizione_id: str) -> SpedizioneResponse:
             destinatario_paese=_iso2(destinatario["paese"]),
             pesi_scatoloni_kg=spedizione["pesi_scatoloni_kg"],
             data_spedizione_iso=_prossima_data_spedizione(),
-            contrassegno_eur=_contrassegno_eur(spedizione["order_number"], ordine),
+            # Totale di tutti gli ordini della spedizione: il corriere
+            # riscuote una volta sola alla consegna (vedi
+            # _contrassegno_totale).
+            contrassegno_eur=_contrassegno_totale(ordini_spedizione),
+            # Ogni collo porta il riferimento del proprio ordine (allineato
+            # ai pesi dal controllo qui sopra).
+            riferimenti_colli=riferimenti_colli,
         )
     except (dhl.DHLConfigError, dhl.DHLAPIError) as exc:
         db.segna_spedizione_fallita(spedizione_id, errore=str(exc))

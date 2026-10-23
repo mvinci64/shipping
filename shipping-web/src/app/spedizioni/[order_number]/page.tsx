@@ -1,7 +1,13 @@
 import Link from "next/link";
 import { shippingClient } from "@/lib/shipping-client";
 import { AzioneForm } from "./AzioneForm";
-import { creaBozzaAction, confermaSpedizioneAction, richiediPickupAction, confermaColloAction } from "./actions";
+import {
+  creaBozzaAction,
+  creaBozzaConsolidataAction,
+  confermaSpedizioneAction,
+  richiediPickupAction,
+  confermaColloAction,
+} from "./actions";
 
 export const metadata = { title: "Dettaglio spedizione — VISCOTTA" };
 
@@ -23,10 +29,11 @@ export default async function DettaglioSpedizione({
   if (data_a) queryLista.set("data_a", data_a);
   const hrefLista = queryLista.size > 0 ? `/spedizioni?${queryLista.toString()}` : "/spedizioni";
 
-  const [cartonizzazione, colli, spedizione] = await Promise.all([
+  const [cartonizzazione, colli, spedizione, consolidabili] = await Promise.all([
     shippingClient.GET("/cartonizzazioni/{order_number}", { params: { path: { order_number } } }),
     shippingClient.GET("/cartonizzazioni/{order_number}/colli", { params: { path: { order_number } } }),
     shippingClient.GET("/spedizioni/per-ordine/{order_number}", { params: { path: { order_number } } }),
+    shippingClient.GET("/spedizioni/consolidabili/{order_number}", { params: { path: { order_number } } }),
   ]);
 
   if (!cartonizzazione.data) {
@@ -112,16 +119,95 @@ export default async function DettaglioSpedizione({
         <section className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
           <h2 className="text-sm font-medium text-zinc-900 dark:text-zinc-100">Spedizione DHL</h2>
 
-          {stato === "non_iniziata" && (
-            <div className="mt-3">
-              <p className="mb-2 text-xs text-zinc-600 dark:text-zinc-400">
-                Nessuna bozza ancora. Creare la bozza quota via DHL /rates — nessun effetto reale.
+          {/* Spedizione consolidata: va detto a schermo, perché pesi,
+              prezzo e contrassegno qui sotto sono di TUTTI gli ordini
+              elencati, non solo di quello aperto — e la conferma resta
+              bloccata finché anche i loro colli non sono confermati. */}
+          {spedizione.data && spedizione.data.ordini_aggregati.length > 0 && (
+            <div className="mt-2 rounded border border-amber-300 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950">
+              <p className="text-xs font-medium text-amber-900 dark:text-amber-200">
+                Spedizione unica per {spedizione.data.ordini_aggregati.length + 1} ordini — pesi, prezzo e
+                contrassegno sono complessivi.
               </p>
-              <AzioneForm
-                action={creaBozzaAction.bind(null, order_number)}
-                etichetta="Crea bozza"
-                classi="bg-zinc-900 text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
-              />
+              <ul className="mt-1 flex flex-col gap-0.5 text-xs text-amber-800 dark:text-amber-300">
+                {[spedizione.data.order_number, ...spedizione.data.ordini_aggregati].map((o) => {
+                  const eCapofila = o === spedizione.data!.order_number;
+                  const eQuestaPagina = o === order_number;
+                  return (
+                    <li key={o}>
+                      {eQuestaPagina ? (
+                        <span className="font-mono font-semibold">{o}</span>
+                      ) : (
+                        <Link href={`/spedizioni/${o}`} className="font-mono underline">
+                          {o}
+                        </Link>
+                      )}
+                      {eCapofila && " (capofila)"}
+                      {eQuestaPagina && " ← ordine aperto"}
+                    </li>
+                  );
+                })}
+              </ul>
+              <p className="mt-1 text-xs text-amber-800 dark:text-amber-300">
+                La conferma richiede i colli confermati di tutti gli ordini elencati.
+              </p>
+            </div>
+          )}
+
+          {stato === "non_iniziata" && (
+            <div className="mt-3 flex flex-col gap-4">
+              <div>
+                <p className="mb-2 text-xs text-zinc-600 dark:text-zinc-400">
+                  Nessuna bozza ancora. Creare la bozza quota via DHL /rates — nessun effetto reale.
+                </p>
+                <AzioneForm
+                  action={creaBozzaAction.bind(null, order_number)}
+                  etichetta="Crea bozza"
+                  classi="bg-zinc-900 text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+                />
+              </div>
+
+              {/* Consolidamento: compare solo quando questo cliente ha
+                  altri ordini in partenza lo stesso giorno, cioè quando
+                  spedirli separatamente significherebbe pagare due
+                  etichette e far venire due volte il corriere. */}
+              {consolidabili.data && consolidabili.data.length > 0 && (
+                <div className="rounded border border-amber-300 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950">
+                  <h3 className="text-sm font-medium text-amber-900 dark:text-amber-200">
+                    Stesso cliente, stessa partenza
+                  </h3>
+                  <p className="mt-1 text-xs text-amber-800 dark:text-amber-300">
+                    Questo cliente ha altri ordini che partono lo stesso giorno. Unendoli si crea una
+                    sola spedizione DHL: una etichetta, un ritiro, un contrassegno complessivo. Ogni
+                    collo resta marcato col suo ordine.
+                  </p>
+                  <AzioneForm
+                    action={creaBozzaConsolidataAction.bind(null, order_number)}
+                    etichetta="Crea bozza unica"
+                    classi="mt-1 bg-amber-700 text-white hover:bg-amber-600 dark:bg-amber-600 dark:hover:bg-amber-500"
+                  >
+                    <div className="flex flex-col gap-1">
+                      {consolidabili.data.map((o) => (
+                        <label
+                          key={o.order_number}
+                          className="flex items-center gap-2 text-xs text-amber-900 dark:text-amber-200"
+                        >
+                          <input
+                            type="checkbox"
+                            name="ordine_aggregato"
+                            value={o.order_number}
+                            defaultChecked
+                          />
+                          <span className="font-mono">{o.order_number}</span>
+                          <span className="text-amber-700 dark:text-amber-400">
+                            {o.n_colli} {o.n_colli === 1 ? "collo" : "colli"}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </AzioneForm>
+                </div>
+              )}
             </div>
           )}
 

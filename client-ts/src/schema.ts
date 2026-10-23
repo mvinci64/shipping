@@ -116,6 +116,72 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/cartonizzazioni/{order_number}/etichetta-omaggio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Etichetta Omaggio Ordine Reale
+         * @description Etichetta collo per omaggi/promozioni (WP40), stampa isolata: non è
+         *     legata a una riga d'ordine, solo cliente + dicitura generica. n copie
+         *     per più WP40 omaggio sullo stesso ordine. Per farla uscire insieme alle
+         *     altre etichette collo dell'ordine (con una nota testuale), registrare
+         *     invece un collo omaggio con POST /cartonizzazioni/{order_number}/colli-omaggio
+         *     — vedi etichette_colli_ordine_reale.
+         */
+        get: operations["etichetta_omaggio_ordine_reale_cartonizzazioni__order_number__etichetta_omaggio_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cartonizzazioni/{order_number}/colli-omaggio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Elenco Colli Omaggio */
+        get: operations["elenco_colli_omaggio_cartonizzazioni__order_number__colli_omaggio_get"];
+        put?: never;
+        /**
+         * Aggiungi Collo Omaggio
+         * @description Registra un collo omaggio/promozione (WP40 aggiunto a mano dal
+         *     reparto, non da una riga d'ordine): la nota finisce stampata insieme
+         *     alle altre etichette collo dell'ordine (etichette-colli), non serve una
+         *     stampa separata.
+         */
+        post: operations["aggiungi_collo_omaggio_cartonizzazioni__order_number__colli_omaggio_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/cartonizzazioni/colli-omaggio/{collo_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Rimuovi Collo Omaggio */
+        delete: operations["rimuovi_collo_omaggio_cartonizzazioni_colli_omaggio__collo_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/cartonizzazioni/{order_number}/colli-misti": {
         parameters: {
             query?: never;
@@ -137,6 +203,13 @@ export interface paths {
          *     Le quantità dei componenti sono validate contro le righe reali
          *     dell'ordine (non possono superare quanto ordinato, sommato agli altri
          *     colli misti già registrati) prima di salvare.
+         *
+         *     formato=None richiede scatolone_indice valorizzato: registra un gruppo
+         *     sfuso (niente scatola interna) piazzato a mano in quello scatolone del
+         *     risultato automatico — caso reale ORD-20260924-6100 (01/10/2026), torte
+         *     caprese spostate in uno scatolone che l'algoritmo considererebbe
+         *     "pieno" per posti, ma che il reparto ha verificato entrarci fisicamente.
+         *     Vedi cartonize.cartonize_order e sql/colli_misti_manuali_sfuso_indice.sql.
          */
         post: operations["aggiungi_collo_misto_cartonizzazioni__order_number__colli_misti_post"];
         delete?: never;
@@ -293,8 +366,39 @@ export interface paths {
          * Crea Bozza Spedizione
          * @description Crea la bozza (stato 'bozza'): quota via /rates e salva su DB.
          *     Nessuna chiamata DHL con effetto reale — solo /rates, come /valida.
+         *
+         *     ordini_aggregati: altri ordini dello STESSO cliente e con la STESSA
+         *     data di consegna da spedire in un'unica spedizione DHL (un collo
+         *     fisico, un'etichetta, un ritiro) — caso reale STREGATE TEA SHOP con
+         *     due ordini separati, 21/10/2026. order_number fa da capofila; pesi e
+         *     contrassegno della bozza sono quelli di tutti gli ordini insieme.
+         *     Vedi _valida_consolidamento per i controlli applicati.
          */
         post: operations["crea_bozza_spedizione_spedizioni_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/spedizioni/consolidabili/{order_number}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ordini Consolidabili
+         * @description Altri ordini che si possono spedire nella stessa spedizione DHL di
+         *     questo (stesso cliente, stessa data di consegna, nessuna spedizione
+         *     già aperta) — vedi POST /spedizioni con ordini_aggregati. Lista vuota
+         *     nel caso normale di un cliente con un solo ordine in partenza.
+         *     Sola lettura, nessun effetto.
+         */
+        get: operations["ordini_consolidabili_spedizioni_consolidabili__order_number__get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -574,9 +678,20 @@ export interface components {
             /** Order Number */
             order_number: string;
             /** Formato */
-            formato: string;
+            formato: string | null;
             /** Contenuto */
             contenuto: components["schemas"]["ComponenteCollo"][];
+            /** Scatolone Indice */
+            scatolone_indice?: number | null;
+        };
+        /** ColloOmaggio */
+        ColloOmaggio: {
+            /** Id */
+            id: string;
+            /** Order Number */
+            order_number: string;
+            /** Nota */
+            nota: string;
         };
         /** ComponenteCollo */
         ComponenteCollo: {
@@ -624,6 +739,15 @@ export interface components {
             /** Token */
             token: string;
         };
+        /** OrdineConsolidabile */
+        OrdineConsolidabile: {
+            /** Order Number */
+            order_number: string;
+            /** Data Consegna */
+            data_consegna: string | null;
+            /** N Colli */
+            n_colli: number;
+        };
         /** RichiestaCartonizzazione */
         RichiestaCartonizzazione: {
             /** Order Number */
@@ -639,9 +763,16 @@ export interface components {
         /** RichiestaColloMisto */
         RichiestaColloMisto: {
             /** Formato */
-            formato: string;
+            formato?: string | null;
             /** Componenti */
             componenti: components["schemas"]["ComponenteCollo"][];
+            /** Scatolone Indice */
+            scatolone_indice?: number | null;
+        };
+        /** RichiestaColloOmaggio */
+        RichiestaColloOmaggio: {
+            /** Nota */
+            nota: string;
         };
         /** RichiestaPickupMultiplo */
         RichiestaPickupMultiplo: {
@@ -668,6 +799,8 @@ export interface components {
             spedizione_stato: string;
             /** Spedizione Id */
             spedizione_id: string | null;
+            /** Spedizione Capofila */
+            spedizione_capofila?: string | null;
         };
         /** RigaOrdine */
         RigaOrdine: {
@@ -756,6 +889,11 @@ export interface components {
             id: string;
             /** Order Number */
             order_number: string;
+            /**
+             * Ordini Aggregati
+             * @default []
+             */
+            ordini_aggregati: string[];
             /** Corriere */
             corriere: string;
             /** Stato */
@@ -976,6 +1114,134 @@ export interface operations {
                 content: {
                     "application/json": unknown;
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    etichetta_omaggio_ordine_reale_cartonizzazioni__order_number__etichetta_omaggio_get: {
+        parameters: {
+            query?: {
+                n?: number;
+            };
+            header?: never;
+            path: {
+                order_number: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    elenco_colli_omaggio_cartonizzazioni__order_number__colli_omaggio_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_number: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ColloOmaggio"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    aggiungi_collo_omaggio_cartonizzazioni__order_number__colli_omaggio_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_number: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RichiestaColloOmaggio"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ColloOmaggio"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rimuovi_collo_omaggio_cartonizzazioni_colli_omaggio__collo_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                collo_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -1252,7 +1518,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": string[] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -1261,6 +1531,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SpedizioneResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ordini_consolidabili_spedizioni_consolidabili__order_number__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_number: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrdineConsolidabile"][];
                 };
             };
             /** @description Validation Error */

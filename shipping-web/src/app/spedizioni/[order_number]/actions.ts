@@ -28,6 +28,27 @@ export async function creaBozzaAction(
   return { errore: null };
 }
 
+// Come creaBozzaAction, ma CONSOLIDA più ordini dello stesso cliente in
+// un'unica spedizione DHL (una etichetta, un ritiro, un costo) — vedi
+// sql/spedizioni_consolidate.sql. Gli ordini da unire arrivano dalle
+// checkbox del form; i controlli (stesso cliente, stessa data, nessuna
+// spedizione già aperta) sono lato shipping-api, che risponde 409/422.
+// Nessun effetto reale: solo /rates.
+export async function creaBozzaConsolidataAction(
+  orderNumber: string, _prev: StatoAzione, formData: FormData,
+): Promise<StatoAzione> {
+  const aggregati = formData.getAll("ordine_aggregato").filter((v): v is string => typeof v === "string");
+  if (aggregati.length === 0) {
+    return { errore: "Seleziona almeno un ordine da unire, o usa «Crea bozza» per il solo ordine corrente." };
+  }
+  const { error } = await shippingClient.POST("/spedizioni", {
+    params: { query: { order_number: orderNumber, ordini_aggregati: aggregati } },
+  });
+  if (error) return { errore: messaggioErrore(error) };
+  revalidatePath(`/spedizioni/${orderNumber}`);
+  return { errore: null };
+}
+
 // EFFETTO REALE: crea la spedizione DHL vera con relativo costo. Il gate
 // sui colli confermati è lato shipping-api (409 se mancano) — qui si
 // propaga solo l'errore.

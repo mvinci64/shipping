@@ -12,6 +12,10 @@ type Riga = {
   colli_confermati: number;
   colli_completo: boolean;
   spedizione_stato: string;
+  // Valorizzato solo se questo ordine viaggia in una spedizione
+  // consolidata di cui non è il capofila (vedi shipping-api
+  // RigaElenco.spedizione_capofila).
+  spedizione_capofila?: string | null;
   spedizione_id: string | null;
 };
 
@@ -117,7 +121,12 @@ export function TabellaSpedizioni({ righe, dataDa, dataA }: Props) {
               if (dataDa) query.set("data_da", dataDa);
               if (dataA) query.set("data_a", dataA);
               const href = `/spedizioni/${riga.order_number}?${query.toString()}`;
-              const selezionabile = riga.spedizione_stato === "confermata" && riga.spedizione_id;
+              // Su una spedizione consolidata la casella sta solo sulla
+              // riga del capofila: le altre righe sono lo STESSO collo
+              // fisico e la stessa spedizione DHL, due caselle per un
+              // ritiro solo confonderebbero il reparto.
+              const selezionabile =
+                riga.spedizione_stato === "confermata" && riga.spedizione_id && !riga.spedizione_capofila;
               return (
                 <tr key={riga.order_number} className="bg-white hover:bg-zinc-50 dark:bg-zinc-950 dark:hover:bg-zinc-900">
                   <td className="px-4 py-2">
@@ -150,6 +159,11 @@ export function TabellaSpedizioni({ righe, dataDa, dataA }: Props) {
                       <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${badge.classi}`}>
                         {badge.testo}
                       </span>
+                      {riga.spedizione_capofila && (
+                        <span className="mt-0.5 block font-mono text-[11px] text-amber-700 dark:text-amber-500">
+                          unita a {riga.spedizione_capofila}
+                        </span>
+                      )}
                     </Link>
                   </td>
                 </tr>

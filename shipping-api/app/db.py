@@ -65,6 +65,78 @@ def fetch_order(order_number: str) -> dict | None:
     }
 
 
+def fetch_dati_consolidamento(order_numbers: list[str]) -> list[dict]:
+    """customer_id e data di consegna richiesta degli ordini indicati —
+    serve a validare un consolidamento (più ordini in un'unica spedizione
+    DHL, vedi sql/spedizioni_consolidate.sql) prima di crearlo.
+
+    Si confronta il customer_id, NON il nome azienda: in viscotta.customers
+    esistono clienti diversi con ragioni sociali quasi identiche (caso
+    reale 21/10/2026: "LA BOTTEGA S.A.S. DI CONTI RAFFAELLA & C." e "LA
+    BOTTEGA DEI CONTI di Stefano Conti", due clienti distinti con ordini e
+    indirizzi diversi) — consolidare per nome significherebbe spedire la
+    merce di un cliente all'indirizzo di un altro. Gli ordini inesistenti
+    semplicemente non compaiono nel risultato: il chiamante confronta le
+    lunghezze per accorgersene."""
+    with get_connection() as conn:
+        righe = conn.execute(
+            """
+            SELECT o.order_number, o.customer_id, o.requested_delivery_date, o.status
+            FROM viscotta.orders o
+            WHERE o.order_number = ANY(%s)
+            """,
+            (order_numbers,),
+        ).fetchall()
+    return [
+        {
+            "order_number": order_number,
+            "customer_id": str(customer_id),
+            "data_consegna": data_consegna.isoformat() if data_consegna else None,
+            "status": status,
+        }
+        for order_number, customer_id, data_consegna, status in righe
+    ]
+
+
+def fetch_ordini_consolidabili(order_number: str) -> list[dict]:
+    """Altri ordini che potrebbero viaggiare nella STESSA spedizione di
+    quello indicato: stesso cliente (customer_id, non il nome — vedi
+    fetch_dati_consolidamento), stessa data di consegna richiesta, stesso
+    filtro "in prenotazione" del resto del reparto, e senza una spedizione
+    già aperta o partita. Lista vuota se non ce n'è nessuno, che è il caso
+    normale. Serve alla UI per proporre il consolidamento solo quando è
+    davvero possibile."""
+    with get_connection() as conn:
+        righe = conn.execute(
+            """
+            SELECT altri.order_number, altri.requested_delivery_date
+            FROM viscotta.orders questo
+            JOIN viscotta.orders altri
+              ON altri.customer_id = questo.customer_id
+             AND altri.requested_delivery_date = questo.requested_delivery_date
+             AND altri.order_number <> questo.order_number
+            WHERE questo.order_number = %s
+              AND altri.status = 'submitted'
+              AND altri.crm_opportunity_id IS NOT NULL
+              AND NOT EXISTS (
+                    SELECT 1 FROM viscotta.spedizioni s
+                    WHERE (s.order_number = altri.order_number
+                           OR altri.order_number = ANY (s.ordini_aggregati))
+                      AND s.stato IN ('bozza', 'confermata', 'ritirata')
+              )
+            ORDER BY altri.order_number
+            """,
+            (order_number,),
+        ).fetchall()
+    return [
+        {
+            "order_number": numero,
+            "data_consegna": data_consegna.isoformat() if data_consegna else None,
+        }
+        for numero, data_consegna in righe
+    ]
+
+
 def fetch_destinatario(order_number: str) -> dict | None:
     """Indirizzo + contatto del cliente per un ordine reale. None se
     l'ordine non esiste. shipping_address è testo libero (via + CAP in
@@ -165,17 +237,35 @@ def fetch_nome_prodotto(sku: str) -> str | None:
 _COLONNE_SPEDIZIONE = """
     id, order_number, corriere, stato, product_code, pesi_scatoloni_kg,
     prezzo_stimato_eur, shipment_tracking_number, tracking_url,
-    dispatch_confirmation_number, errore, creata_at, confermata_at, ritirata_at
+    dispatch_confirmation_number, errore, creata_at, confermata_at, ritirata_at,
+    ordini_aggregati
 """
+
+# Un ordine QUALSIASI della spedizione, capofila o aggregato (vedi
+# sql/spedizioni_consolidate.sql): serve per ritrovare la spedizione
+# partendo da un ordine consolidato, che altrimenti risulterebbe "da
+# iniziare" pur essendo già spedito.
+_SPEDIZIONE_CONTIENE_ORDINE = "(order_number = %s OR %s = ANY (ordini_aggregati))"
+
+
+def ordini_di_spedizione(spedizione: dict) -> list[str]:
+    """Tutti gli ordini di una spedizione: il capofila più gli eventuali
+    ordini consolidati nella stessa spedizione DHL (spedizione unica per
+    più ordini dello stesso destinatario — vedi
+    sql/spedizioni_consolidate.sql). Per una spedizione normale
+    (non consolidata) restituisce la sola lista [order_number]."""
+    return [spedizione["order_number"], *spedizione["ordini_aggregati"]]
 
 
 def _spedizione_da_riga(row) -> dict:
     (id_, order_number, corriere, stato, product_code, pesi_scatoloni_kg,
      prezzo_stimato_eur, shipment_tracking_number, tracking_url,
-     dispatch_confirmation_number, errore, creata_at, confermata_at, ritirata_at) = row
+     dispatch_confirmation_number, errore, creata_at, confermata_at, ritirata_at,
+     ordini_aggregati) = row
     return {
         "id": str(id_),
         "order_number": order_number,
+        "ordini_aggregati": list(ordini_aggregati or []),
         "corriere": corriere,
         "stato": stato,
         "product_code": product_code,
@@ -194,19 +284,27 @@ def _spedizione_da_riga(row) -> dict:
 def crea_spedizione_bozza(
     *, order_number: str, corriere: str, product_code: str,
     pesi_scatoloni_kg: list[float], prezzo_stimato_eur: float | None,
+    ordini_aggregati: list[str] | None = None,
 ) -> dict:
     """Crea la riga in stato 'bozza' — nessuna chiamata DHL con effetto
     reale è ancora avvenuta a questo punto (solo /rates, già fatto dal
-    chiamante per ottenere product_code/prezzo)."""
+    chiamante per ottenere product_code/prezzo).
+
+    ordini_aggregati: altri ordini dello stesso destinatario consolidati
+    in questa unica spedizione DHL (vedi sql/spedizioni_consolidate.sql);
+    order_number resta il capofila. pesi_scatoloni_kg deve già contenere
+    i pesi di TUTTI gli ordini, capofila incluso."""
     with get_connection() as conn:
         row = conn.execute(
             f"""
             INSERT INTO viscotta.spedizioni
-                (order_number, corriere, product_code, pesi_scatoloni_kg, prezzo_stimato_eur)
-            VALUES (%s, %s, %s, %s, %s)
+                (order_number, corriere, product_code, pesi_scatoloni_kg,
+                 prezzo_stimato_eur, ordini_aggregati)
+            VALUES (%s, %s, %s, %s, %s, %s)
             RETURNING {_COLONNE_SPEDIZIONE}
             """,
-            (order_number, corriere, product_code, pesi_scatoloni_kg, prezzo_stimato_eur),
+            (order_number, corriere, product_code, pesi_scatoloni_kg,
+             prezzo_stimato_eur, ordini_aggregati or []),
         ).fetchone()
         conn.commit()
     return _spedizione_da_riga(row)
@@ -451,11 +549,11 @@ def fetch_elenco_spedizioni(data_da, data_a) -> list[dict]:
             spedizione_row = conn.execute(
                 f"""
                 SELECT {_COLONNE_SPEDIZIONE} FROM viscotta.spedizioni
-                WHERE order_number = %s
+                WHERE {_SPEDIZIONE_CONTIENE_ORDINE}
                 ORDER BY creata_at DESC
                 LIMIT 1
                 """,
-                (order_number,),
+                (order_number, order_number),
             ).fetchone()
             risultato.append({
                 "order_number": order_number,
@@ -472,16 +570,20 @@ def fetch_ultima_spedizione_per_ordine(order_number: str) -> dict | None:
     """Spedizione più recente per un ordine (per order_number possono
     esistere più righe nel tempo: una bozza cancellata e poi ricreata, un
     tentativo fallito seguito da uno riuscito). None se non è mai stata
-    creata nessuna bozza — l'ordine è "da iniziare", non è un errore."""
+    creata nessuna bozza — l'ordine è "da iniziare", non è un errore.
+
+    Trova anche le spedizioni CONSOLIDATE in cui l'ordine non è il
+    capofila ma uno degli ordini_aggregati (vedi
+    sql/spedizioni_consolidate.sql)."""
     with get_connection() as conn:
         row = conn.execute(
             f"""
             SELECT {_COLONNE_SPEDIZIONE} FROM viscotta.spedizioni
-            WHERE order_number = %s
+            WHERE {_SPEDIZIONE_CONTIENE_ORDINE}
             ORDER BY creata_at DESC
             LIMIT 1
             """,
-            (order_number,),
+            (order_number, order_number),
         ).fetchone()
     return _spedizione_da_riga(row) if row else None
 
@@ -700,21 +802,29 @@ def fetch_spedizioni_tracciabili(data_da, data_a) -> list[dict]:
     """Spedizioni con un tracking number reale (stato 'confermata' o
     'ritirata') per ordini con consegna richiesta nella finestra — la
     lista su cui interrogare il tracking DHL (sola lettura, vedi
-    dhl.traccia_spedizione). Una per order_number: la più recente."""
+    dhl.traccia_spedizione). Una riga per order_number: la più recente.
+
+    Una spedizione CONSOLIDATA (vedi sql/spedizioni_consolidate.sql)
+    produce una riga per OGNI suo ordine, capofila e aggregati, tutte con
+    lo stesso tracking number: cercando il secondo ordine di un cliente
+    consolidato si trova comunque la spedizione che lo trasporta, invece
+    di non trovare nulla."""
     with get_connection() as conn:
         rows = conn.execute(
             """
-            SELECT DISTINCT ON (s.order_number)
-                s.order_number, c.company_name, s.stato,
+            SELECT DISTINCT ON (so.order_number)
+                so.order_number, c.company_name, s.stato,
                 s.shipment_tracking_number, s.dispatch_confirmation_number,
                 s.tracking_url, o.requested_delivery_date
             FROM viscotta.spedizioni s
-            JOIN viscotta.orders o ON o.order_number = s.order_number
+            CROSS JOIN LATERAL unnest(ARRAY[s.order_number] || s.ordini_aggregati)
+                AS so(order_number)
+            JOIN viscotta.orders o ON o.order_number = so.order_number
             JOIN viscotta.customers c ON c.id = o.customer_id
             WHERE s.stato IN ('confermata', 'ritirata')
               AND s.shipment_tracking_number IS NOT NULL
               AND o.requested_delivery_date BETWEEN %s AND %s
-            ORDER BY s.order_number, s.creata_at DESC
+            ORDER BY so.order_number, s.creata_at DESC
             """,
             (data_da, data_a),
         ).fetchall()

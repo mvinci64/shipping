@@ -16,6 +16,12 @@ cp .env.example .env   # imposta DATABASE_URL, credenziali MyDHL, indirizzo orig
 # automatica: modifica strutturale su un DB condiviso col Portal/BI/miniMRP)
 psql "$DATABASE_URL" -f ../sql/spedizioni_fsm.sql
 
+# Spedizioni consolidate (più ordini dello stesso cliente in un'unica
+# spedizione DHL) — aggiunge spedizioni.ordini_aggregati. ATTENZIONE:
+# il codice legge questa colonna in OGNI query sulle spedizioni, quindi
+# va applicata PRIMA di far partire/deployare questa versione.
+psql "$DATABASE_URL" -f ../sql/spedizioni_consolidate.sql
+
 uvicorn app.main:app --reload
 ```
 

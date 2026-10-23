@@ -206,10 +206,181 @@
         }
       }
     },
+    "/cartonizzazioni/{order_number}/etichetta-omaggio": {
+      "get": {
+        "summary": "Etichetta Omaggio Ordine Reale",
+        "description": "Etichetta collo per omaggi/promozioni (WP40), stampa isolata: non è\nlegata a una riga d'ordine, solo cliente + dicitura generica. n copie\nper più WP40 omaggio sullo stesso ordine. Per farla uscire insieme alle\naltre etichette collo dell'ordine (con una nota testuale), registrare\ninvece un collo omaggio con POST /cartonizzazioni/{order_number}/colli-omaggio\n— vedi etichette_colli_ordine_reale.",
+        "operationId": "etichetta_omaggio_ordine_reale_cartonizzazioni__order_number__etichetta_omaggio_get",
+        "parameters": [
+          {
+            "name": "order_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Order Number"
+            }
+          },
+          {
+            "name": "n",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1,
+              "title": "N"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cartonizzazioni/{order_number}/colli-omaggio": {
+      "post": {
+        "summary": "Aggiungi Collo Omaggio",
+        "description": "Registra un collo omaggio/promozione (WP40 aggiunto a mano dal\nreparto, non da una riga d'ordine): la nota finisce stampata insieme\nalle altre etichette collo dell'ordine (etichette-colli), non serve una\nstampa separata.",
+        "operationId": "aggiungi_collo_omaggio_cartonizzazioni__order_number__colli_omaggio_post",
+        "parameters": [
+          {
+            "name": "order_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Order Number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RichiestaColloOmaggio"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ColloOmaggio"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "Elenco Colli Omaggio",
+        "operationId": "elenco_colli_omaggio_cartonizzazioni__order_number__colli_omaggio_get",
+        "parameters": [
+          {
+            "name": "order_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Order Number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ColloOmaggio"
+                  },
+                  "title": "Response Elenco Colli Omaggio Cartonizzazioni  Order Number  Colli Omaggio Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cartonizzazioni/colli-omaggio/{collo_id}": {
+      "delete": {
+        "summary": "Rimuovi Collo Omaggio",
+        "operationId": "rimuovi_collo_omaggio_cartonizzazioni_colli_omaggio__collo_id__delete",
+        "parameters": [
+          {
+            "name": "collo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Collo Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/cartonizzazioni/{order_number}/colli-misti": {
       "post": {
         "summary": "Aggiungi Collo Misto",
-        "description": "Registra un collo con più SKU insieme (WP40/WP50), deciso a mano dal\nreparto quando i prodotti coinvolti non sono censiti singolarmente —\nvedi cartonize.SFUSO_SKUS/GRAMMATURA_G e sql/colli_misti_manuali.sql.\nLe quantità dei componenti sono validate contro le righe reali\ndell'ordine (non possono superare quanto ordinato, sommato agli altri\ncolli misti già registrati) prima di salvare.",
+        "description": "Registra un collo con più SKU insieme (WP40/WP50), deciso a mano dal\nreparto quando i prodotti coinvolti non sono censiti singolarmente —\nvedi cartonize.SFUSO_SKUS/GRAMMATURA_G e sql/colli_misti_manuali.sql.\nLe quantità dei componenti sono validate contro le righe reali\ndell'ordine (non possono superare quanto ordinato, sommato agli altri\ncolli misti già registrati) prima di salvare.\n\nformato=None richiede scatolone_indice valorizzato: registra un gruppo\nsfuso (niente scatola interna) piazzato a mano in quello scatolone del\nrisultato automatico — caso reale ORD-20260924-6100 (01/10/2026), torte\ncaprese spostate in uno scatolone che l'algoritmo considererebbe\n\"pieno\" per posti, ma che il reparto ha verificato entrarci fisicamente.\nVedi cartonize.cartonize_order e sql/colli_misti_manuali_sfuso_indice.sql.",
         "operationId": "aggiungi_collo_misto_cartonizzazioni__order_number__colli_misti_post",
         "parameters": [
           {
@@ -543,12 +714,72 @@
     "/spedizioni": {
       "post": {
         "summary": "Crea Bozza Spedizione",
-        "description": "Crea la bozza (stato 'bozza'): quota via /rates e salva su DB.\nNessuna chiamata DHL con effetto reale — solo /rates, come /valida.",
+        "description": "Crea la bozza (stato 'bozza'): quota via /rates e salva su DB.\nNessuna chiamata DHL con effetto reale — solo /rates, come /valida.\n\nordini_aggregati: altri ordini dello STESSO cliente e con la STESSA\ndata di consegna da spedire in un'unica spedizione DHL (un collo\nfisico, un'etichetta, un ritiro) — caso reale STREGATE TEA SHOP con\ndue ordini separati, 21/10/2026. order_number fa da capofila; pesi e\ncontrassegno della bozza sono quelli di tutti gli ordini insieme.\nVedi _valida_consolidamento per i controlli applicati.",
         "operationId": "crea_bozza_spedizione_spedizioni_post",
         "parameters": [
           {
             "name": "order_number",
             "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Order Number"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Ordini Aggregati"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpedizioneResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/spedizioni/consolidabili/{order_number}": {
+      "get": {
+        "summary": "Ordini Consolidabili",
+        "description": "Altri ordini che si possono spedire nella stessa spedizione DHL di\nquesto (stesso cliente, stessa data di consegna, nessuna spedizione\ngià aperta) — vedi POST /spedizioni con ordini_aggregati. Lista vuota\nnel caso normale di un cliente con un solo ordine in partenza.\nSola lettura, nessun effetto.",
+        "operationId": "ordini_consolidabili_spedizioni_consolidabili__order_number__get",
+        "parameters": [
+          {
+            "name": "order_number",
+            "in": "path",
             "required": true,
             "schema": {
               "type": "string",
@@ -562,7 +793,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SpedizioneResponse"
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OrdineConsolidabile"
+                  },
+                  "title": "Response Ordini Consolidabili Spedizioni Consolidabili  Order Number  Get"
                 }
               }
             }
@@ -1151,7 +1386,14 @@
             "title": "Order Number"
           },
           "formato": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Formato"
           },
           "contenuto": {
@@ -1160,6 +1402,17 @@
             },
             "type": "array",
             "title": "Contenuto"
+          },
+          "scatolone_indice": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scatolone Indice"
           }
         },
         "type": "object",
@@ -1170,6 +1423,29 @@
           "contenuto"
         ],
         "title": "ColloMisto"
+      },
+      "ColloOmaggio": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "order_number": {
+            "type": "string",
+            "title": "Order Number"
+          },
+          "nota": {
+            "type": "string",
+            "title": "Nota"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "order_number",
+          "nota"
+        ],
+        "title": "ColloOmaggio"
       },
       "ComponenteCollo": {
         "properties": {
@@ -1291,6 +1567,36 @@
         ],
         "title": "LogoutRequest"
       },
+      "OrdineConsolidabile": {
+        "properties": {
+          "order_number": {
+            "type": "string",
+            "title": "Order Number"
+          },
+          "data_consegna": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Consegna"
+          },
+          "n_colli": {
+            "type": "integer",
+            "title": "N Colli"
+          }
+        },
+        "type": "object",
+        "required": [
+          "order_number",
+          "data_consegna",
+          "n_colli"
+        ],
+        "title": "OrdineConsolidabile"
+      },
       "RichiestaCartonizzazione": {
         "properties": {
           "order_number": {
@@ -1320,7 +1626,14 @@
       "RichiestaColloMisto": {
         "properties": {
           "formato": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Formato"
           },
           "componenti": {
@@ -1329,14 +1642,37 @@
             },
             "type": "array",
             "title": "Componenti"
+          },
+          "scatolone_indice": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scatolone Indice"
           }
         },
         "type": "object",
         "required": [
-          "formato",
           "componenti"
         ],
         "title": "RichiestaColloMisto"
+      },
+      "RichiestaColloOmaggio": {
+        "properties": {
+          "nota": {
+            "type": "string",
+            "title": "Nota"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nota"
+        ],
+        "title": "RichiestaColloOmaggio"
       },
       "RichiestaPickupMultiplo": {
         "properties": {
@@ -1413,6 +1749,17 @@
               }
             ],
             "title": "Spedizione Id"
+          },
+          "spedizione_capofila": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spedizione Capofila"
           }
         },
         "type": "object",
@@ -1720,6 +2067,14 @@
           "order_number": {
             "type": "string",
             "title": "Order Number"
+          },
+          "ordini_aggregati": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Ordini Aggregati",
+            "default": []
           },
           "corriere": {
             "type": "string",

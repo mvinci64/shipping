@@ -165,6 +165,7 @@ def crea_spedizione(
     data_spedizione_iso: str,
     contrassegno_eur: float | None = None,
     contrassegno_metodo: str = "Q",
+    riferimenti_colli: list[str] | None = None,
 ) -> dict:
     """Chiama POST /shipments — crea la spedizione reale ed emette
     l'etichetta (base64 in risposta). A differenza di valida_spedizione
@@ -179,8 +180,22 @@ def crea_spedizione(
     riscosso alla consegna. contrassegno_metodo è una delle lettere in
     CONTRASSEGNO_METODI_VALIDI; il payload MyDHL vuole la lettera ripetuta
     3 volte (es. "Q" -> "QQQ", non ancora chiaro perché, così da specifica).
+
+    riferimenti_colli: numero d'ordine da stampare come riferimento su
+    OGNI singolo collo, parallelo a pesi_scatoloni_kg. Serve alle
+    spedizioni consolidate (più ordini dello stesso destinatario in
+    un'unica spedizione DHL, vedi sql/spedizioni_consolidate.sql): ogni
+    collo porta il riferimento del PROPRIO ordine, non quello del
+    capofila, così in magazzino e in reso si risale all'ordine giusto.
+    Se assente, tutti i colli riportano order_number (comportamento di
+    sempre per le spedizioni a ordine singolo).
     """
     account, username, password = _credentials()
+    if riferimenti_colli is not None and len(riferimenti_colli) != len(pesi_scatoloni_kg):
+        raise DHLConfigError(
+            f"riferimenti_colli ha {len(riferimenti_colli)} elementi ma i colli sono "
+            f"{len(pesi_scatoloni_kg)}: ogni collo deve avere il riferimento del suo ordine"
+        )
     if not (ORIGIN_POSTAL_CODE and ORIGIN_CITY and ORIGIN_ADDRESS_LINE):
         raise DHLConfigError(
             "Indirizzo di origine (magazzino VISCOTTA) non configurato: "
@@ -239,8 +254,12 @@ def crea_spedizione(
         },
         "content": {
             "packages": [
-                {**_package(peso), "customerReferences": [{"value": order_number, "typeCode": "CU"}]}
-                for peso in pesi_scatoloni_kg
+                {**_package(peso), "customerReferences": [{"value": riferimento, "typeCode": "CU"}]}
+                for peso, riferimento in zip(
+                    pesi_scatoloni_kg,
+                    riferimenti_colli if riferimenti_colli is not None
+                    else [order_number] * len(pesi_scatoloni_kg),
+                )
             ],
             "isCustomsDeclarable": destinatario_paese != ORIGIN_COUNTRY_CODE,
             "declaredValue": 1,

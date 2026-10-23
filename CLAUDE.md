@@ -29,7 +29,7 @@ Decisione presa e da mantenere: **backend Python (FastAPI) + frontend TypeScript
 - `shipping-api/` (futuro) — Python/FastAPI. Gemma dal prototipo; contigua al miniMRP (Python), tiene aperta la porta a OR-Tools per colli misti.
 - `shipping-web/` (futuro) — TS/React. UI operativa di reparto (scanner, stati collo, stampa).
 - Contratto tra i due mondi: **OpenAPI generata da FastAPI** → client TS tipizzati (anche per il Portal).
-- Le spedizioni sono **sempre 1:1 con gli ordini** (confermato): niente consolidamenti/parziali.
+- Le spedizioni sono **di norma 1:1 con gli ordini**: niente parziali (un ordine non si spezza su più spedizioni). **Eccezione dal 23/10/2026**: più ordini dello **stesso cliente con la stessa data di consegna** possono essere consolidati in **un'unica spedizione DHL** (un'etichetta, un ritiro, un contrassegno complessivo) — caso reale STREGATE TEA SHOP con due ordini separati. Vedi `sql/spedizioni_consolidate.sql`: `spedizioni.order_number` resta il **capofila**, gli altri stanno in `ordini_aggregati`; `db.ordini_di_spedizione()` dà l'insieme completo. Ogni collo porta comunque il riferimento del **proprio** ordine sull'etichetta DHL (`dhl.crea_spedizione(riferimenti_colli=...)`), e la conferma è bloccata finché i colli di **tutti** gli ordini non sono confermati.
 
 ## Regole di dominio (censimento imballi del 26/08, fonte: Vincenza + squadra packaging)
 
