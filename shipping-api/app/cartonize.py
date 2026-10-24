@@ -37,11 +37,14 @@ GRAMMATURA_G = {
     # — vedi valutazione-cartonizzazione.md). Qui "grammatura" è il peso
     # dell'intera confezione (non del singolo pasticcino: queste SKU sono
     # vendute come scatola assortita, ogni unità ordinata = una scatola),
-    # dato dall'utente: 100g le scatole da 5 pezzi, 200g quelle da 10,
-    # indipendentemente da regalo/natalizia; Marunetta e Spiritose pesate
-    # a parte (box da 6, ricette diverse).
+    # dato dall'utente: 100g le scatole da 5 pezzi, 200g quelle da 10.
+    # La regola 5pz=100g / 10pz=200g vale per TUTTE le regalo/natalizie,
+    # Marunetta e Spiritose incluse (confermato dall'utente 24/10/2026);
+    # restano pesate a parte solo le scatole da 6 di quelle due ricette,
+    # che sono un'altra famiglia di prodotto (SCATM06*, qui sotto).
     "SCATR05A": 100, "SCATRN05A": 100,
     "SCATR10A": 200, "SCATRN10A": 200,
+    "SCATRM05A": 100, "SCATRS05A": 100,
     "SCATM06M": 180,
     "SCATM06SR": 150, "SCATM06SA": 150,
     # Pasta di mandorla singola, stesso biscotto delle scatole/buste
@@ -143,6 +146,12 @@ PEZZI_PER_COLLO = {
     "SCATR10A":  {"WP40": 6},
     "SCATRN05A": {"WP40": 6},
     "SCATRN10A": {"WP40": 6},
+    # SCATRM05A (Regalo 5 Marunetta) e SCATRS05A (Natale 5 Spiritose):
+    # attive in catalogo ma mai censite, finivano tra i "non censiti" al
+    # primo ordine — aggiunte 24/10/2026 con la stessa regola delle altre
+    # regalo/natalizie, prima che arrivi un ordine a bloccarsi.
+    "SCATRM05A": {"WP40": 6},
+    "SCATRS05A": {"WP40": 6},
     # MSAL1KG: configurazione ideale precisata dall'utente 15/09/2026 —
     # solo WP40 (niente WP50), 2 unità da 1kg (= 4 buste da 500g, ~2kg) a
     # collo, capacità propria diversa dagli altri tre formati da 1kg.
