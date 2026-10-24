@@ -31,6 +31,12 @@ GRAMMATURA_G = {
     "TCAP075": 75, "CANT200": 200, "BRUT150": 150,
     "VP08BUST": 160, "BOXOV": 150, "SCAT20V08": 160,
     "MSAL1KG": 1000, "CHMS1KG": 1000, "CANTS1KG": 1000, "GRM1KG": 1000,
+    # MPEL1KG (Pelata da 1Kg) e MSGU1000 (sgusciata/al Naturale da 1 kg):
+    # altri due formati da 1kg, censiti 24/10/2026 — "i chili seguono le
+    # scelte fatte per MSAL1KG" (utente), quindi anche la capacità collo.
+    # ATTENZIONE: MSGU1000 (sgusciata) è diverso da MGUS500 (con guscio),
+    # sigle invertite e prodotti diversi — non confonderli.
+    "MPEL1KG": 1000, "MSGU1000": 1000,
     "MCIOC1KG": 1000, "CMEN1KG": 1000,
     "TCAP200SC": 200,
     # Scatole regalo/Natale (SKU confermati 12/09/2026, prima "da confermare"
@@ -161,6 +167,16 @@ PEZZI_PER_COLLO = {
     # solo WP40 (niente WP50), 2 unità da 1kg (= 4 buste da 500g, ~2kg) a
     # collo, capacità propria diversa dagli altri tre formati da 1kg.
     "MSAL1KG":   {"WP40": 2},
+    # MPEL1KG/MSGU1000: stessa scelta di MSAL1KG, confermata dall'utente
+    # 24/10/2026 ("i chili seguono le scelte fatte per MSAL1KG").
+    "MPEL1KG":   {"WP40": 2},
+    "MSGU1000":  {"WP40": 2},
+    # MGUS500 (Mandorle con Guscio, 500g): 24 per WP50 dato dall'utente
+    # 24/10/2026. Il valore WP40 (12) è la metà per convenzione, non una
+    # pesata: serve solo se un giorno si ordina una quantità che non
+    # riempie un WP50 — con i 24 pz del primo ordine reale
+    # (ORD-20260613-1046) esce esattamente un WP50 pieno e non si usa.
+    "MGUS500":   {"WP50": 24, "WP40": 12},
     # MCIOC1KG/CMEN1KG: stessa capacità propria di MSAL1KG (solo WP40, 2
     # unità da 1kg a collo) — confermato dall'utente 20/10/2026, primo
     # ordine reale STREGATE TEA SHOP (ORD-20261019-8334).
