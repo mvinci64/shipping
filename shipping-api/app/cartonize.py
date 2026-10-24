@@ -76,6 +76,11 @@ GRAMMATURA_G = {
     # altre (20g): confermato dall'utente 07/10/2026 a 25g/pz, primo ordine
     # reale IMPORT-DMLAB-20260617-01-B (DROGHERIA CIRLA).
     "VP09": 25, "VP10": 25,
+    # VP11/VP12, stessa famiglia e stessa grammatura di VP09 ("sono come
+    # VP09", utente 24/10/2026) — 25 g/pz, non i 20 g delle paste più
+    # vecchie. Primi ordini reali ORD-20260930-4454 (VP12) e
+    # ORD-20260505-5931 (VP11+VP12).
+    "VP11": 25, "VP12": 25,
 }
 
 # SKU "sfusi": niente scatola interna WP40/WP50, i pezzi riempiono
@@ -175,6 +180,7 @@ PEZZI_PER_COLLO = {
     "VP04": {"WP50": 100, "WP40": 50}, "VP05": {"WP50": 100, "WP40": 50},
     "VP06": {"WP50": 100, "WP40": 50}, "VP08": {"WP50": 100, "WP40": 50},
     "VP09": {"WP50": 100, "WP40": 50}, "VP10": {"WP50": 100, "WP40": 50},
+    "VP11": {"WP50": 100, "WP40": 50}, "VP12": {"WP50": 100, "WP40": 50},
 }
 
 # sku: {formato: (pezzi, peso_g)} — peso ricalcolato dalla formula sopra,
