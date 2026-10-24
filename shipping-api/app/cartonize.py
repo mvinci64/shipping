@@ -81,9 +81,12 @@ GRAMMATURA_G = {
 # collo per questi SKU mostra solo la quantità, senza formato — deciso
 # dall'utente 11/09/2026 per TCAP200SC, esteso alle scatole regalo/Natale
 # il 12/09/2026. Primi ordini reali: ORD-20260908-6587, ORD-20260505-4944.
+# NOTA (19/10/2026 -> 24/10/2026): le scatole regalo/natalizie assortite
+# (SCATR05A/SCATR10A/SCATRN05A/SCATRN10A) NON sono più sfuse — vanno in
+# WP40 da 6 scatole, vedi PEZZI_PER_COLLO. Restano sfuse solo le scatole
+# da 6 Marunetta/Spiritose e le torte.
 SFUSO_SKUS = {
     "TCAP200SC", "TCAP500SC", "TCAP500IR",
-    "SCATR05A", "SCATR10A", "SCATRN05A", "SCATRN10A",
     "SCATM06M", "SCATM06SR", "SCATM06SA",
     "SCAT20V16",
 }
@@ -129,6 +132,17 @@ PEZZI_PER_COLLO = {
     "VP08BUST":  {"WP50": 12, "WP40": 6},
     "BOXOV":     {"WP40": 6},
     "SCAT20V08": {"WP40": 6},
+    # Scatole regalo/natalizie assortite: 6 scatole per WP40, niente WP50
+    # — confermato dall'utente 24/10/2026, stessa regola per tutte e
+    # quattro indipendentemente da regalo/natalizia e da 5/10 paste.
+    # Prima erano trattate come sfuse (un'unica riga con tutti i pezzi):
+    # un cliente con 12 scatole deve invece ricevere DUE colli, quindi due
+    # etichette — caso reale ENOTECA INCONTRI DIVINI (STAMERRA),
+    # IMPORT-DMLAB-20260713-01, con 12 SCATRN05A e 12 SCATRN10A.
+    "SCATR05A":  {"WP40": 6},
+    "SCATR10A":  {"WP40": 6},
+    "SCATRN05A": {"WP40": 6},
+    "SCATRN10A": {"WP40": 6},
     # MSAL1KG: configurazione ideale precisata dall'utente 15/09/2026 —
     # solo WP40 (niente WP50), 2 unità da 1kg (= 4 buste da 500g, ~2kg) a
     # collo, capacità propria diversa dagli altri tre formati da 1kg.
