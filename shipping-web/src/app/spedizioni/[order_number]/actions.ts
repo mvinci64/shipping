@@ -41,8 +41,13 @@ export async function creaBozzaConsolidataAction(
   if (aggregati.length === 0) {
     return { errore: "Seleziona almeno un ordine da unire, o usa «Crea bozza» per il solo ordine corrente." };
   }
+  // ordini_aggregati va nel BODY, non in query: shipping-api lo dichiara
+  // come campo del corpo (lista, quindi FastAPI non lo tratta come query
+  // param) e il corpo è opzionale — passarlo in query non darebbe errore,
+  // creerebbe silenziosamente una bozza NON consolidata.
   const { error } = await shippingClient.POST("/spedizioni", {
-    params: { query: { order_number: orderNumber, ordini_aggregati: aggregati } },
+    params: { query: { order_number: orderNumber } },
+    body: { ordini_aggregati: aggregati, colli_dichiarati: null },
   });
   if (error) return { errore: messaggioErrore(error) };
   revalidatePath(`/spedizioni/${orderNumber}`);
