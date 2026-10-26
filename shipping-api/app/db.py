@@ -238,7 +238,7 @@ _COLONNE_SPEDIZIONE = """
     id, order_number, corriere, stato, product_code, pesi_scatoloni_kg,
     prezzo_stimato_eur, shipment_tracking_number, tracking_url,
     dispatch_confirmation_number, errore, creata_at, confermata_at, ritirata_at,
-    ordini_aggregati
+    ordini_aggregati, colli_dichiarati
 """
 
 # Un ordine QUALSIASI della spedizione, capofila o aggregato (vedi
@@ -261,11 +261,15 @@ def _spedizione_da_riga(row) -> dict:
     (id_, order_number, corriere, stato, product_code, pesi_scatoloni_kg,
      prezzo_stimato_eur, shipment_tracking_number, tracking_url,
      dispatch_confirmation_number, errore, creata_at, confermata_at, ritirata_at,
-     ordini_aggregati) = row
+     ordini_aggregati, colli_dichiarati) = row
     return {
         "id": str(id_),
         "order_number": order_number,
         "ordini_aggregati": list(ordini_aggregati or []),
+        # None = pesi calcolati dalla cartonizzazione (caso normale).
+        # Valorizzato = pacchi reali dichiarati a mano dal reparto, vedi
+        # sql/spedizioni_colli_dichiarati.sql.
+        "colli_dichiarati": colli_dichiarati,
         "corriere": corriere,
         "stato": stato,
         "product_code": product_code,
@@ -285,6 +289,7 @@ def crea_spedizione_bozza(
     *, order_number: str, corriere: str, product_code: str,
     pesi_scatoloni_kg: list[float], prezzo_stimato_eur: float | None,
     ordini_aggregati: list[str] | None = None,
+    colli_dichiarati: list[dict] | None = None,
 ) -> dict:
     """Crea la riga in stato 'bozza' — nessuna chiamata DHL con effetto
     reale è ancora avvenuta a questo punto (solo /rates, già fatto dal
@@ -293,18 +298,25 @@ def crea_spedizione_bozza(
     ordini_aggregati: altri ordini dello stesso destinatario consolidati
     in questa unica spedizione DHL (vedi sql/spedizioni_consolidate.sql);
     order_number resta il capofila. pesi_scatoloni_kg deve già contenere
-    i pesi di TUTTI gli ordini, capofila incluso."""
+    i pesi di TUTTI gli ordini, capofila incluso.
+
+    colli_dichiarati: pacchi reali dichiarati a mano quando il reparto ha
+    impacchettato diversamente dalla regola dei 6 posti (vedi
+    sql/spedizioni_colli_dichiarati.sql). Quando è valorizzato,
+    pesi_scatoloni_kg deve esserne la proiezione (un peso per pacco, nello
+    stesso ordine), così tutto ciò che legge i pesi resta coerente."""
     with get_connection() as conn:
         row = conn.execute(
             f"""
             INSERT INTO viscotta.spedizioni
                 (order_number, corriere, product_code, pesi_scatoloni_kg,
-                 prezzo_stimato_eur, ordini_aggregati)
-            VALUES (%s, %s, %s, %s, %s, %s)
+                 prezzo_stimato_eur, ordini_aggregati, colli_dichiarati)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             RETURNING {_COLONNE_SPEDIZIONE}
             """,
             (order_number, corriere, product_code, pesi_scatoloni_kg,
-             prezzo_stimato_eur, ordini_aggregati or []),
+             prezzo_stimato_eur, ordini_aggregati or [],
+             Jsonb(colli_dichiarati) if colli_dichiarati is not None else None),
         ).fetchone()
         conn.commit()
     return _spedizione_da_riga(row)

@@ -18,6 +18,10 @@ class SpedizioneResponse(BaseModel):
     # spedizione DHL (vuoto per le spedizioni a ordine singolo, che
     # restano il caso normale) — vedi sql/spedizioni_consolidate.sql.
     ordini_aggregati: list[str] = []
+    # None nel caso normale (pesi dalla cartonizzazione); valorizzato se
+    # il reparto ha dichiarato a mano i pacchi reali — vedi
+    # sql/spedizioni_colli_dichiarati.sql.
+    colli_dichiarati: list[dict] | None = None
     corriere: str
     stato: str
     product_code: str | None
@@ -305,9 +309,76 @@ def _contrassegno_totale(ordini: list[str]) -> float | None:
     return round(sum(importi), 2) if importi else None
 
 
+class ColloDichiarato(BaseModel):
+    """Un pacco FISICO realmente spedito, dichiarato dal reparto quando
+    l'impacchettamento reale non segue la regola dei 6 posti."""
+    peso_kg: float
+    # Ordini la cui merce è dentro questo pacco: finiscono come
+    # riferimenti sull'etichetta DHL del collo. Più di uno quando il
+    # pacco contiene merce di ordini diversi (spedizione consolidata).
+    ordini: list[str]
+
+
+def _valida_colli_dichiarati(
+    colli: list[ColloDichiarato], ordini_spedizione: list[str], peso_calcolato_kg: float,
+) -> None:
+    """Controlli sui pacchi dichiarati a mano. Qui si sta sostituendo il
+    calcolo con un dato umano su una spedizione a costo reale, quindi i
+    controlli servono a intercettare gli errori di battitura prima che
+    diventino un'etichetta DHL sbagliata."""
+    if not colli:
+        raise HTTPException(status_code=422, detail="colli_dichiarati non può essere vuoto")
+    for i, collo in enumerate(colli, 1):
+        if collo.peso_kg <= 0:
+            raise HTTPException(status_code=422, detail=f"Collo {i}: peso_kg deve essere positivo")
+        if not collo.ordini:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Collo {i}: indicare almeno un ordine (serve per il riferimento sull'etichetta)",
+            )
+        estranei = [o for o in collo.ordini if o not in ordini_spedizione]
+        if estranei:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"Collo {i}: gli ordini {', '.join(estranei)} non fanno parte di questa "
+                    f"spedizione (ordini della spedizione: {', '.join(ordini_spedizione)})"
+                ),
+            )
+
+    # Ogni ordine della spedizione deve stare in almeno un pacco: se un
+    # ordine non è in nessun collo, la sua merce non risulta spedita da
+    # nessuna parte e la sua etichetta non verrebbe stampata.
+    coperti = {o for collo in colli for o in collo.ordini}
+    scoperti = [o for o in ordini_spedizione if o not in coperti]
+    if scoperti:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Nessun collo dichiarato contiene gli ordini: {', '.join(scoperti)}",
+        )
+
+    # Il peso totale dichiarato non può scostarsi troppo dal calcolato: un
+    # po' di differenza è normale (meno scatoloni = meno tara e carta), ma
+    # un fattore 2 è quasi sempre un errore di digitazione, e il peso è
+    # ciò su cui DHL fattura.
+    peso_dichiarato = sum(c.peso_kg for c in colli)
+    if peso_calcolato_kg > 0 and not (
+        0.5 * peso_calcolato_kg <= peso_dichiarato <= 1.5 * peso_calcolato_kg
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Peso dichiarato {round(peso_dichiarato, 2)} kg troppo distante dal calcolato "
+                f"{round(peso_calcolato_kg, 2)} kg (atteso entro ±50%): verificare i pesi inseriti"
+            ),
+        )
+
+
 @router.post("/spedizioni", response_model=SpedizioneResponse)
 def crea_bozza_spedizione(
-    order_number: str, ordini_aggregati: list[str] | None = None,
+    order_number: str,
+    ordini_aggregati: list[str] | None = None,
+    colli_dichiarati: list[ColloDichiarato] | None = None,
 ) -> SpedizioneResponse:
     """Crea la bozza (stato 'bozza'): quota via /rates e salva su DB.
     Nessuna chiamata DHL con effetto reale — solo /rates, come /valida.
@@ -324,13 +395,22 @@ def crea_bozza_spedizione(
 
     ordine, destinatario = _ordine_e_destinatario(order_number)
     tutti_gli_ordini = [order_number, *aggregati]
-    pesi_kg, _riferimenti = _pesi_e_riferimenti(tutti_gli_ordini)
+    pesi_calcolati, _riferimenti = _pesi_e_riferimenti(tutti_gli_ordini)
+
+    if colli_dichiarati:
+        _valida_colli_dichiarati(colli_dichiarati, tutti_gli_ordini, sum(pesi_calcolati))
+        pesi_kg = [c.peso_kg for c in colli_dichiarati]
+        dichiarati = [c.model_dump() for c in colli_dichiarati]
+    else:
+        pesi_kg = pesi_calcolati
+        dichiarati = None
+
     risposta_dhl = _quota(destinatario, pesi_kg, _prossima_data_spedizione())
     product_code, prezzo = _scegli_prodotto(risposta_dhl)
     bozza = db.crea_spedizione_bozza(
         order_number=order_number, corriere="dhl", product_code=product_code,
         pesi_scatoloni_kg=pesi_kg, prezzo_stimato_eur=prezzo,
-        ordini_aggregati=aggregati,
+        ordini_aggregati=aggregati, colli_dichiarati=dichiarati,
     )
     return SpedizioneResponse(**bozza, contrassegno_eur=_contrassegno_totale(tutti_gli_ordini))
 
@@ -550,23 +630,33 @@ def conferma_spedizione(spedizione_id: str) -> SpedizioneResponse:
             ),
         )
 
-    # I riferimenti per collo vanno ricalcolati dalla cartonizzazione di
-    # adesso, ma i pesi su cui si è quotato (e che DHL fatturerà) sono
-    # quelli salvati sulla bozza: se nel frattempo la cartonizzazione è
-    # cambiata (un collo misto registrato dopo la bozza, una capacità SKU
-    # censita nel frattempo) le due cose non combaciano più e l'etichetta
-    # riporterebbe riferimenti sbagliati. Meglio fermarsi e far ricreare
-    # la bozza che emettere una spedizione reale incoerente.
-    pesi_ora, riferimenti_colli = _pesi_e_riferimenti(ordini_spedizione)
-    if pesi_ora != [float(p) for p in spedizione["pesi_scatoloni_kg"]]:
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                "La cartonizzazione è cambiata dopo la creazione della bozza "
-                f"(bozza: {spedizione['pesi_scatoloni_kg']} kg, adesso: {pesi_ora} kg): "
-                "annullare questa bozza e ricrearla prima di confermare"
-            ),
-        )
+    if spedizione["colli_dichiarati"]:
+        # Pacchi dichiarati a mano dal reparto (vedi
+        # sql/spedizioni_colli_dichiarati.sql): sono un dato umano sui
+        # pacchi FISICI, non vanno ricalcolati né confrontati con la
+        # cartonizzazione — è proprio il caso in cui i due numeri
+        # divergono di proposito.
+        riferimenti_colli = [c["ordini"] for c in spedizione["colli_dichiarati"]]
+    else:
+        # I riferimenti per collo vanno ricalcolati dalla cartonizzazione
+        # di adesso, ma i pesi su cui si è quotato (e che DHL fatturerà)
+        # sono quelli salvati sulla bozza: se nel frattempo la
+        # cartonizzazione è cambiata (un collo misto registrato dopo la
+        # bozza, una capacità SKU censita nel frattempo) le due cose non
+        # combaciano più e l'etichetta riporterebbe riferimenti sbagliati.
+        # Meglio fermarsi e far ricreare la bozza che emettere una
+        # spedizione reale incoerente.
+        pesi_ora, riferimenti_per_collo = _pesi_e_riferimenti(ordini_spedizione)
+        if pesi_ora != [float(p) for p in spedizione["pesi_scatoloni_kg"]]:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "La cartonizzazione è cambiata dopo la creazione della bozza "
+                    f"(bozza: {spedizione['pesi_scatoloni_kg']} kg, adesso: {pesi_ora} kg): "
+                    "annullare questa bozza e ricrearla prima di confermare"
+                ),
+            )
+        riferimenti_colli = [[o] for o in riferimenti_per_collo]
 
     try:
         risposta = dhl.crea_spedizione(

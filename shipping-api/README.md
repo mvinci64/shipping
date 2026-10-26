@@ -22,6 +22,12 @@ psql "$DATABASE_URL" -f ../sql/spedizioni_fsm.sql
 # va applicata PRIMA di far partire/deployare questa versione.
 psql "$DATABASE_URL" -f ../sql/spedizioni_consolidate.sql
 
+# Colli dichiarati a mano (quando il reparto impacchetta più fitto della
+# regola dei 6 posti e i pacchi reali sono meno di quelli calcolati).
+# Anche questa colonna è letta da ogni query sulle spedizioni: applicare
+# PRIMA di deployare questa versione.
+psql "$DATABASE_URL" -f ../sql/spedizioni_colli_dichiarati.sql
+
 uvicorn app.main:app --reload
 ```
 

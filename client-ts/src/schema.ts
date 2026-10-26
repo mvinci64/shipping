@@ -671,6 +671,24 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** Body_crea_bozza_spedizione_spedizioni_post */
+        Body_crea_bozza_spedizione_spedizioni_post: {
+            /** Ordini Aggregati */
+            ordini_aggregati?: string[] | null;
+            /** Colli Dichiarati */
+            colli_dichiarati?: components["schemas"]["ColloDichiarato"][] | null;
+        };
+        /**
+         * ColloDichiarato
+         * @description Un pacco FISICO realmente spedito, dichiarato dal reparto quando
+         *     l'impacchettamento reale non segue la regola dei 6 posti.
+         */
+        ColloDichiarato: {
+            /** Peso Kg */
+            peso_kg: number;
+            /** Ordini */
+            ordini: string[];
+        };
         /** ColloMisto */
         ColloMisto: {
             /** Id */
@@ -894,6 +912,10 @@ export interface components {
              * @default []
              */
             ordini_aggregati: string[];
+            /** Colli Dichiarati */
+            colli_dichiarati?: {
+                [key: string]: unknown;
+            }[] | null;
             /** Corriere */
             corriere: string;
             /** Stato */
@@ -1520,7 +1542,7 @@ export interface operations {
         };
         requestBody?: {
             content: {
-                "application/json": string[] | null;
+                "application/json": components["schemas"]["Body_crea_bozza_spedizione_spedizioni_post"];
             };
         };
         responses: {

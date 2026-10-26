@@ -731,18 +731,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "anyOf": [
-                  {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  },
-                  {
-                    "type": "null"
-                  }
-                ],
-                "title": "Ordini Aggregati"
+                "$ref": "#/components/schemas/Body_crea_bozza_spedizione_spedizioni_post"
               }
             }
           }
@@ -1375,6 +1364,62 @@
   },
   "components": {
     "schemas": {
+      "Body_crea_bozza_spedizione_spedizioni_post": {
+        "properties": {
+          "ordini_aggregati": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ordini Aggregati"
+          },
+          "colli_dichiarati": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ColloDichiarato"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Colli Dichiarati"
+          }
+        },
+        "type": "object",
+        "title": "Body_crea_bozza_spedizione_spedizioni_post"
+      },
+      "ColloDichiarato": {
+        "properties": {
+          "peso_kg": {
+            "type": "number",
+            "title": "Peso Kg"
+          },
+          "ordini": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Ordini"
+          }
+        },
+        "type": "object",
+        "required": [
+          "peso_kg",
+          "ordini"
+        ],
+        "title": "ColloDichiarato",
+        "description": "Un pacco FISICO realmente spedito, dichiarato dal reparto quando\nl'impacchettamento reale non segue la regola dei 6 posti."
+      },
       "ColloMisto": {
         "properties": {
           "id": {
@@ -2075,6 +2120,21 @@
             "type": "array",
             "title": "Ordini Aggregati",
             "default": []
+          },
+          "colli_dichiarati": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Colli Dichiarati"
           },
           "corriere": {
             "type": "string",
