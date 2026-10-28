@@ -68,6 +68,60 @@ def _cap_destinatario(destinatario: dict) -> str:
     return destinatario.get("cap") or _estrai_cap(destinatario["indirizzo"])
 
 
+# Coda "<CAP> <CITTÀ> (<PROV>)" di shipping_address, es.
+# "GLI AMICI DEL GALLI VIA SAN GIUSEPPE 18 21047 SARONNO (VA)".
+DESTINAZIONE_RE = re.compile(r"(?<!\d)(\d{5})(?!\d)\s+(.+?)\s*\(\s*([A-Za-z]{2})\s*\)\s*$")
+
+
+def _destinazione(destinatario: dict) -> tuple[str, str, str]:
+    """CAP, città e provincia da mandare al corriere — (cap, citta, prov).
+
+    Normalmente vengono da customers (cap/city/province). Ma quelle
+    colonne descrivono la SEDE del cliente, mentre shipping_address è la
+    destinazione merce: quando le due differiscono davvero, prenderle da
+    fonti diverse produce un indirizzo ibrido. Caso reale GLI AMICI DEL
+    GALLI (IMPORT-DMLAB-20261027-01, 28/10/2026): via di Saronno (VA) con
+    CAP, città e provincia di Turate (CO), due comuni e due province
+    diverse — segnalato dal team del Portal, il cui import popola
+    customers.cap dal CustomerPostcode della sede legale.
+
+    Regola: si usa la destinazione di shipping_address — tutta intera,
+    CAP+città+provincia insieme, mai mischiata con l'anagrafica — solo
+    quando da quel testo si legge una destinazione completa che differisce
+    dall'anagrafica SIA per città SIA per CAP. In ogni altro caso resta il
+    comportamento di sempre.
+
+    Servono entrambe le condizioni, per due motivi distinti misurati sui
+    121 ordini in prenotazione (28/10/2026):
+
+    - città diversa ma stesso CAP non è un'altra destinazione, è un altro
+      NOME dello stesso posto, e cambiarlo non migliora l'instradamento
+      (DHL instrada sul CAP) mentre rischia un rifiuto per città non
+      valida per quel CAP. Casi reali: IL CORAZZIERE "22046 BAGGERO"
+      contro MERONE in anagrafica (Baggero è una frazione di Merone), e
+      PALLARO ENRICO "21100 VARESE" contro VIGGIU.
+    - CAP diverso ma stessa città è quasi sempre un dato sbagliato nel
+      testo libero: PASTICCERIA ERNANI (IMPORT-DMLAB-20260706-01) riporta
+      22070 per LURATE CACCIVIO, il cui CAP reale è 22075 come in
+      anagrafica. Fidarsi del CAP parsato avrebbe spedito sul CAP errato.
+
+    Con entrambe le condizioni l'unico ordine che cambia comportamento è
+    proprio GLI AMICI DEL GALLI."""
+    citta_anagrafica = (destinatario.get("citta") or "").strip()
+    prov_anagrafica = (destinatario.get("provincia") or "").strip()
+    cap_corrente = _cap_destinatario(destinatario)
+
+    match = DESTINAZIONE_RE.search(destinatario.get("indirizzo") or "")
+    if match:
+        cap_sped, citta_sped, prov_sped = match.group(1), match.group(2).strip(), match.group(3).upper()
+        citta_diversa = bool(citta_sped) and citta_sped.casefold() != citta_anagrafica.casefold()
+        cap_diverso = cap_sped != cap_corrente
+        if citta_diversa and cap_diverso:
+            return cap_sped, citta_sped, prov_sped
+
+    return cap_corrente, citta_anagrafica, prov_anagrafica
+
+
 # Prefissi di via noti, per tagliare via il nome azienda quando precede la
 # via nel formato "NOME VIA STRADA N CAP CITTÀ (PROV)" (vedi commento sopra
 # CAP_RE). Elenco minimo, esteso quando emerge un caso reale non coperto.
@@ -166,11 +220,12 @@ def _pesi_scatoloni_kg(order_number: str, ordine: dict) -> list[float]:
 
 
 def _quota(destinatario: dict, pesi_kg: list[float], data_iso: str) -> dict:
+    cap_dest, citta_dest, prov_dest = _destinazione(destinatario)
     try:
         return dhl.valida_spedizione(
-            destinatario_cap=_cap_destinatario(destinatario),
-            destinatario_citta=destinatario["citta"],
-            destinatario_provincia=destinatario["provincia"] or "",
+            destinatario_cap=cap_dest,
+            destinatario_citta=citta_dest,
+            destinatario_provincia=prov_dest,
             destinatario_paese=_iso2(destinatario["paese"]),
             pesi_scatoloni_kg=pesi_kg,
             data_spedizione_iso=data_iso,
@@ -658,6 +713,7 @@ def conferma_spedizione(spedizione_id: str) -> SpedizioneResponse:
             )
         riferimenti_colli = [[o] for o in riferimenti_per_collo]
 
+    cap_dest, citta_dest, prov_dest = _destinazione(destinatario)
     try:
         risposta = dhl.crea_spedizione(
             order_number=spedizione["order_number"],
@@ -666,9 +722,9 @@ def conferma_spedizione(spedizione_id: str) -> SpedizioneResponse:
             destinatario_email=destinatario["email"] or "",
             destinatario_telefono=destinatario["telefono"] or "",
             destinatario_indirizzo=_indirizzo_spedizione(destinatario["indirizzo"]),
-            destinatario_cap=_cap_destinatario(destinatario),
-            destinatario_citta=destinatario["citta"],
-            destinatario_provincia=destinatario["provincia"] or "",
+            destinatario_cap=cap_dest,
+            destinatario_citta=citta_dest,
+            destinatario_provincia=prov_dest,
             destinatario_paese=_iso2(destinatario["paese"]),
             pesi_scatoloni_kg=spedizione["pesi_scatoloni_kg"],
             data_spedizione_iso=_prossima_data_spedizione(),
