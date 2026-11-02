@@ -141,6 +141,44 @@ function Zona({ titolo, data, righe }: { titolo: string; data: string; righe: Ri
   );
 }
 
+function Foglio({
+  intestazione,
+  altraData,
+  righe,
+  interrompiPagina = false,
+}: {
+  intestazione: { data: string; giorno: string };
+  altraData: string;
+  righe: Riga[];
+  /** Forza il salto pagina dopo questo foglio, così in stampa il giorno
+   *  successivo parte su un A4 nuovo invece di accodarsi a questo. */
+  interrompiPagina?: boolean;
+}) {
+  return (
+    <div
+      className={`w-full max-w-[210mm] border-2 border-zinc-900 bg-white p-8 print:w-auto print:border-0 print:p-0 dark:border-zinc-100 dark:bg-zinc-950 print:dark:bg-white${
+        interrompiPagina ? " print:[break-after:page]" : ""
+      }`}
+    >
+      <div className="flex min-h-[250mm] flex-col gap-8 print:min-h-0">
+        <div className="flex items-baseline justify-between border-b-[3px] border-zinc-900 pb-4 dark:border-zinc-100 print:border-zinc-900">
+          <h2 className="font-mono text-2xl font-extrabold uppercase tracking-tight text-zinc-900 print:text-zinc-900 dark:text-zinc-50">
+            Spedizioni del giorno
+          </h2>
+          <span className="font-mono text-sm text-zinc-500">
+            foglio {intestazione.data} · l&apos;altro giorno è {altraData}
+          </span>
+        </div>
+        <Zona titolo={intestazione.data} data={intestazione.giorno} righe={righe} />
+        <div className="flex justify-between border-t-2 border-zinc-900 pt-2 font-mono text-[11px] text-zinc-500 dark:border-zinc-100">
+          <span>reparto logistica · VISCOTTA</span>
+          <span>dati: ordini &quot;in prenotazione&quot;, partenza = consegna richiesta − 2 giorni lavorativi</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default async function Cartellone({
   searchParams,
 }: {
@@ -173,7 +211,7 @@ export default async function Cartellone({
   const int2 = formattaIntestazione(giorno2);
 
   return (
-    <div className="flex flex-1 flex-col items-center bg-zinc-50 font-sans print:bg-white dark:bg-black">
+    <div className="flex flex-1 flex-col items-center gap-6 bg-zinc-50 pb-8 font-sans print:gap-0 print:bg-white print:pb-0 dark:bg-black">
       <div className="flex w-full max-w-4xl flex-col gap-4 px-8 py-8 print:hidden">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-semibold tracking-tight text-black dark:text-zinc-50">Cartellone spedizioni</h1>
@@ -216,24 +254,18 @@ export default async function Cartellone({
         )}
       </div>
 
-      <div className="w-full max-w-[210mm] flex-1 border-2 border-zinc-900 bg-white p-8 print:w-auto print:flex-none print:border-0 print:p-0 dark:border-zinc-100 dark:bg-zinc-950 print:dark:bg-white">
-        <div className="flex h-full flex-col gap-8 print:h-auto">
-          <div className="flex items-baseline justify-between border-b-[3px] border-zinc-900 pb-4 dark:border-zinc-100 print:border-zinc-900">
-            <h2 className="font-mono text-2xl font-extrabold uppercase tracking-tight text-zinc-900 print:text-zinc-900 dark:text-zinc-50">
-              Spedizioni della settimana
-            </h2>
-            <span className="font-mono text-sm text-zinc-500">
-              {int1.data}–{int2.data} 2026
-            </span>
-          </div>
-          <Zona titolo={int1.data} data={int1.giorno} righe={righeGiorno1} />
-          <Zona titolo={int2.data} data={int2.giorno} righe={righeGiorno2} />
-          <div className="flex justify-between border-t-2 border-zinc-900 pt-2 font-mono text-[11px] text-zinc-500 dark:border-zinc-100">
-            <span>reparto logistica · VISCOTTA</span>
-            <span>dati: ordini &quot;in prenotazione&quot;, partenza = consegna richiesta − 2 giorni lavorativi</span>
-          </div>
-        </div>
-      </div>
+      {/* Un foglio A4 per giorno di partenza: i gruppi reali arrivano a
+          16 ordini (04/11/2026), che su mezza pagina condivisa
+          diventerebbero illeggibili da lontano — e un cartellone serve
+          proprio a essere letto da lontano. Due fogli da appendere
+          affiancati tengono i nomi grandi. */}
+      <Foglio
+        intestazione={int1}
+        altraData={int2.data}
+        righe={righeGiorno1}
+        interrompiPagina
+      />
+      <Foglio intestazione={int2} altraData={int1.data} righe={righeGiorno2} />
 
       <style>{`
         @media print {
