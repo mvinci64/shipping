@@ -54,6 +54,23 @@ export async function creaBozzaConsolidataAction(
   return { errore: null };
 }
 
+// Nessun effetto reale: cancella una BOZZA, cioè una spedizione che su
+// DHL non è mai stata creata (nessuna etichetta, nessun costo). Serve
+// quando la bozza è diventata obsoleta: se la cartonizzazione cambia
+// dopo averla creata, la conferma viene rifiutata con 409 e l'unica via
+// è buttarla e rifarla — caso reale PALLOTTI ADRIANO 03/11/2026, bozza
+// del 06/09 da 4,4 kg contro 10,27 kg reali.
+export async function annullaBozzaAction(
+  spedizioneId: string, orderNumber: string, _prev: StatoAzione, _formData: FormData,
+): Promise<StatoAzione> {
+  const { error } = await shippingClient.DELETE("/spedizioni/{spedizione_id}", {
+    params: { path: { spedizione_id: spedizioneId } },
+  });
+  if (error) return { errore: messaggioErrore(error) };
+  revalidatePath(`/spedizioni/${orderNumber}`);
+  return { errore: null };
+}
+
 // EFFETTO REALE: crea la spedizione DHL vera con relativo costo. Il gate
 // sui colli confermati è lato shipping-api (409 se mancano) — qui si
 // propaga solo l'errore.

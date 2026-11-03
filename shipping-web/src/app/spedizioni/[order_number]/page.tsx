@@ -2,6 +2,7 @@ import Link from "next/link";
 import { shippingClient } from "@/lib/shipping-client";
 import { AzioneForm } from "./AzioneForm";
 import {
+  annullaBozzaAction,
   creaBozzaAction,
   creaBozzaConsolidataAction,
   confermaSpedizioneAction,
@@ -229,6 +230,22 @@ export default async function DettaglioSpedizione({
                 testoDaDigitare={order_number}
                 bloccatoPer={motivoBloccoConferma}
               />
+              {/* La conferma viene rifiutata se la cartonizzazione è
+                  cambiata dopo la creazione della bozza: senza questo
+                  bottone l'operatore legge "annullare e ricreare" e non
+                  ha modo di farlo. Cancellare una bozza non tocca DHL —
+                  la spedizione non è mai stata creata. */}
+              <div className="border-t border-zinc-200 pt-3 dark:border-zinc-800">
+                <p className="mb-2 text-xs text-zinc-600 dark:text-zinc-400">
+                  Bozza obsoleta (es. la cartonizzazione è cambiata dopo averla creata)? Annullala e
+                  ricreala: nessun effetto su DHL, la spedizione non è ancora stata emessa.
+                </p>
+                <AzioneForm
+                  action={annullaBozzaAction.bind(null, spedizione.data.id, order_number)}
+                  etichetta="Annulla bozza"
+                  classi="border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                />
+              </div>
             </div>
           )}
 
