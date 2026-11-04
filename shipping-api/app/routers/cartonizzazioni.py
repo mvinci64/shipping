@@ -28,6 +28,13 @@ class ComponenteCollo(BaseModel):
     pezzi: int
 
 
+class EtichettaCollo(BaseModel):
+    """SKU e quantità stampati sul collo al posto dell'elenco componenti —
+    vedi sql/colli_misti_etichetta_override.sql."""
+    sku: str
+    pezzi: int
+
+
 class ScatolaInterna(BaseModel):
     # formato None per gli SKU sfusi (vedi cartonize.SFUSO_SKUS): niente
     # scatola interna, i pezzi riempiono lo scatolone direttamente.
@@ -38,6 +45,7 @@ class ScatolaInterna(BaseModel):
     pezzi: int
     peso_g: int
     componenti: list[ComponenteCollo] | None = None
+    etichetta: EtichettaCollo | None = None
 
 
 class Scatolone(BaseModel):
@@ -173,6 +181,14 @@ def etichette_colli_ordine_reale(order_number: str, con_lotto: bool = False) -> 
         for carton in result["scatoloni"] for item in carton["contenuto"]
         for comp in item.get("componenti") or []
     }
+    # SKU dell'override etichetta (vedi
+    # sql/colli_misti_etichetta_override.sql): non è una riga d'ordine, va
+    # raccolto a parte o l'etichetta stamperebbe il codice senza nome.
+    skus |= {
+        item["etichetta"]["sku"]
+        for carton in result["scatoloni"] for item in carton["contenuto"]
+        if item.get("etichetta")
+    }
     nomi = {sku: nome for sku in skus if (nome := db.fetch_nome_prodotto(sku)) is not None}
     gtins = {sku: gtin for sku in skus if (gtin := db.fetch_gtin(sku)) is not None}
     lotti = {}
@@ -263,6 +279,12 @@ class RichiestaColloMisto(BaseModel):
     formato: str | None = None
     componenti: list[ComponenteCollo]
     scatolone_indice: int | None = None
+    # Override dell'etichetta: SKU e quantità da stampare sul collo al
+    # posto di "Collo misto" con l'elenco dei componenti — per quando le
+    # paste del contenuto sono state confezionate in un prodotto finito
+    # (scatola da 9). Vedi sql/colli_misti_etichetta_override.sql.
+    etichetta_sku: str | None = None
+    etichetta_pezzi: int | None = None
 
 
 class ColloMisto(BaseModel):
@@ -271,6 +293,8 @@ class ColloMisto(BaseModel):
     formato: str | None
     contenuto: list[ComponenteCollo]
     scatolone_indice: int | None = None
+    etichetta_sku: str | None = None
+    etichetta_pezzi: int | None = None
 
 
 @router.post("/cartonizzazioni/{order_number}/colli-misti", response_model=ColloMisto)
@@ -294,6 +318,20 @@ def aggiungi_collo_misto(order_number: str, richiesta: RichiestaColloMisto) -> C
         raise HTTPException(status_code=422, detail="scatolone_indice obbligatorio per un gruppo sfuso (formato assente)")
     if richiesta.formato is not None and richiesta.scatolone_indice:
         raise HTTPException(status_code=422, detail="scatolone_indice si applica solo ai gruppi sfusi (formato assente)")
+    if (richiesta.etichetta_sku is None) != (richiesta.etichetta_pezzi is None):
+        raise HTTPException(
+            status_code=422,
+            detail="etichetta_sku e etichetta_pezzi vanno indicati insieme (o nessuno dei due)",
+        )
+    if richiesta.etichetta_pezzi is not None and richiesta.etichetta_pezzi <= 0:
+        raise HTTPException(status_code=422, detail="etichetta_pezzi deve essere positivo")
+    if richiesta.etichetta_sku is not None and db.fetch_nome_prodotto(richiesta.etichetta_sku) is None:
+        # Senza nome a catalogo l'etichetta mostrerebbe un codice nudo:
+        # meglio fermarsi che stampare un collo non identificabile.
+        raise HTTPException(
+            status_code=422,
+            detail=f"SKU {richiesta.etichetta_sku} non trovato in viscotta.products: etichetta non stampabile",
+        )
     ordine = _ordine_reale(order_number)
     esistenti = db.fetch_colli_misti_per_cartonize(order_number) or []
     nuovo = {
@@ -308,7 +346,10 @@ def aggiungi_collo_misto(order_number: str, richiesta: RichiestaColloMisto) -> C
     except KeyError as exc:
         raise HTTPException(status_code=422, detail=f"Peso non censito per SKU {exc}") from exc
 
-    creato = db.aggiungi_collo_misto(order_number, richiesta.formato, nuovo["componenti"], richiesta.scatolone_indice)
+    creato = db.aggiungi_collo_misto(
+        order_number, richiesta.formato, nuovo["componenti"], richiesta.scatolone_indice,
+        etichetta_sku=richiesta.etichetta_sku, etichetta_pezzi=richiesta.etichetta_pezzi,
+    )
     return ColloMisto(**creato)
 
 

@@ -701,6 +701,10 @@ export interface components {
             contenuto: components["schemas"]["ComponenteCollo"][];
             /** Scatolone Indice */
             scatolone_indice?: number | null;
+            /** Etichetta Sku */
+            etichetta_sku?: string | null;
+            /** Etichetta Pezzi */
+            etichetta_pezzi?: number | null;
         };
         /** ColloOmaggio */
         ColloOmaggio: {
@@ -713,6 +717,17 @@ export interface components {
         };
         /** ComponenteCollo */
         ComponenteCollo: {
+            /** Sku */
+            sku: string;
+            /** Pezzi */
+            pezzi: number;
+        };
+        /**
+         * EtichettaCollo
+         * @description SKU e quantità stampati sul collo al posto dell'elenco componenti —
+         *     vedi sql/colli_misti_etichetta_override.sql.
+         */
+        EtichettaCollo: {
             /** Sku */
             sku: string;
             /** Pezzi */
@@ -786,6 +801,10 @@ export interface components {
             componenti: components["schemas"]["ComponenteCollo"][];
             /** Scatolone Indice */
             scatolone_indice?: number | null;
+            /** Etichetta Sku */
+            etichetta_sku?: string | null;
+            /** Etichetta Pezzi */
+            etichetta_pezzi?: number | null;
         };
         /** RichiestaColloOmaggio */
         RichiestaColloOmaggio: {
@@ -884,6 +903,7 @@ export interface components {
             peso_g: number;
             /** Componenti */
             componenti?: components["schemas"]["ComponenteCollo"][] | null;
+            etichetta?: components["schemas"]["EtichettaCollo"] | null;
         };
         /** Scatolone */
         Scatolone: {

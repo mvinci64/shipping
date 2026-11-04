@@ -1458,6 +1458,28 @@
               }
             ],
             "title": "Scatolone Indice"
+          },
+          "etichetta_sku": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Etichetta Sku"
+          },
+          "etichetta_pezzi": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Etichetta Pezzi"
           }
         },
         "type": "object",
@@ -1509,6 +1531,25 @@
           "pezzi"
         ],
         "title": "ComponenteCollo"
+      },
+      "EtichettaCollo": {
+        "properties": {
+          "sku": {
+            "type": "string",
+            "title": "Sku"
+          },
+          "pezzi": {
+            "type": "integer",
+            "title": "Pezzi"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sku",
+          "pezzi"
+        ],
+        "title": "EtichettaCollo",
+        "description": "SKU e quantità stampati sul collo al posto dell'elenco componenti —\nvedi sql/colli_misti_etichetta_override.sql."
       },
       "EventoTracking": {
         "properties": {
@@ -1698,6 +1739,28 @@
               }
             ],
             "title": "Scatolone Indice"
+          },
+          "etichetta_sku": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Etichetta Sku"
+          },
+          "etichetta_pezzi": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Etichetta Pezzi"
           }
         },
         "type": "object",
@@ -2048,6 +2111,16 @@
               }
             ],
             "title": "Componenti"
+          },
+          "etichetta": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EtichettaCollo"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",

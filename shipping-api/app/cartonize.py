@@ -238,13 +238,15 @@ def pack_cartons(boxes):
     """Scatole interne → scatoloni (first-fit, WP50 prima). Gli SKU sfusi
     (fmt None) non occupano posti: riempiono lo scatolone corrente dopo
     aver piazzato le scatole interne WP50/WP40. boxes è una lista di
-    4-tuple (fmt, sku, pezzi, peso) o 5-tuple (fmt, sku, pezzi, peso,
-    componenti) per i colli misti (sku è None in quel caso — vedi
-    collo_misto_box)."""
+    4-tuple (fmt, sku, pezzi, peso), 5-tuple con componenti per i colli
+    misti (sku è None in quel caso — vedi collo_misto_box) o 6-tuple con
+    in coda l'override dell'etichetta (vedi
+    sql/colli_misti_etichetta_override.sql)."""
     cartons = []
     for box in sorted(boxes, key=lambda b: -POSTI.get(b[0], 0)):
         fmt, sku, pezzi, peso = box[:4]
         componenti = box[4] if len(box) > 4 else None
+        etichetta = box[5] if len(box) > 5 else None
         posti = POSTI.get(fmt, 0)
         target = next(
             (c for c in cartons if c["posti_usati"] < POSTI_SCATOLONE and c["posti_usati"] + posti <= POSTI_SCATOLONE),
@@ -257,12 +259,28 @@ def pack_cartons(boxes):
         entry = {"formato": fmt, "sku": sku, "pezzi": pezzi, "peso_g": peso}
         if componenti:
             entry["componenti"] = componenti
+        if etichetta:
+            entry["etichetta"] = etichetta
         target["contenuto"].append(entry)
         target["peso_g"] += peso
     return cartons
 
 
-def collo_misto_box(formato: str | None, componenti: list[dict]) -> tuple:
+def _etichetta_di(collo_misto: dict) -> dict | None:
+    """Override dell'etichetta di un collo misto, se registrato: lo SKU e
+    la quantità da stampare al posto di "Collo misto" con l'elenco dei
+    componenti. Serve quando le paste sfuse del contenuto sono state
+    confezionate in un prodotto finito (scatola da 9) che è ciò che va
+    presentato a destino — vedi sql/colli_misti_etichetta_override.sql.
+    Non entra nel calcolo del peso: quello resta sui componenti reali."""
+    sku = collo_misto.get("etichetta_sku")
+    pezzi = collo_misto.get("etichetta_pezzi")
+    if sku and pezzi:
+        return {"sku": sku, "pezzi": pezzi}
+    return None
+
+
+def collo_misto_box(formato: str | None, componenti: list[dict], etichetta: dict | None = None) -> tuple:
     """Costruisce un box 'misto' pronto per pack_cartons: più SKU nella
     stessa scatola interna, peso somma dei componenti (stessa formula di
     _peso_collo_g). componenti: [{"sku": ..., "pezzi": ...}, ...]. Ogni sku
@@ -279,7 +297,7 @@ def collo_misto_box(formato: str | None, componenti: list[dict]) -> tuple:
     if formato is not None:
         peso += TARA_COLLO_G[formato]
     pezzi_totali = sum(c["pezzi"] for c in componenti)
-    return (formato, None, pezzi_totali, peso, componenti)
+    return (formato, None, pezzi_totali, peso, componenti, etichetta)
 
 
 def cartonize_order(rows, colli_misti: list[dict] | None = None):
@@ -332,7 +350,7 @@ def cartonize_order(rows, colli_misti: list[dict] | None = None):
     colli_misti_forzati = [cm for cm in colli_misti if cm.get("formato") is None and cm.get("scatolone_indice")]
     for cm in colli_misti:
         if cm not in colli_misti_forzati:
-            boxes.append(collo_misto_box(cm["formato"], cm["componenti"]))
+            boxes.append(collo_misto_box(cm["formato"], cm["componenti"], _etichetta_di(cm)))
 
     cartons = pack_cartons(boxes)
 
@@ -340,10 +358,16 @@ def cartonize_order(rows, colli_misti: list[dict] | None = None):
         indice = cm["scatolone_indice"] - 1
         while len(cartons) <= indice:
             cartons.append({"posti_usati": 0, "contenuto": [], "peso_g": TARA_SCATOLONE_G + CARTA_RIEMPIMENTO_G})
-        _, _, pezzi_totali, peso, componenti = collo_misto_box(None, cm["componenti"])
-        cartons[indice]["contenuto"].append(
-            {"formato": None, "sku": None, "pezzi": pezzi_totali, "peso_g": peso, "componenti": componenti}
+        _, _, pezzi_totali, peso, componenti, etichetta = collo_misto_box(
+            None, cm["componenti"], _etichetta_di(cm)
         )
+        entry = {
+            "formato": None, "sku": None, "pezzi": pezzi_totali,
+            "peso_g": peso, "componenti": componenti,
+        }
+        if etichetta:
+            entry["etichetta"] = etichetta
+        cartons[indice]["contenuto"].append(entry)
         cartons[indice]["peso_g"] += peso
 
     return {

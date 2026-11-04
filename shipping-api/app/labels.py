@@ -136,6 +136,31 @@ def make_inner_labels_pdf(
         # dal reparto — vedi cartonize.collo_misto_box): una riga SKU+nome+
         # quantità per componente invece del blocco a SKU singolo qui sotto.
         # Niente barcode: non c'è un solo GTIN da rappresentare.
+        # Override dell'etichetta (vedi
+        # sql/colli_misti_etichetta_override.sql): le paste sfuse dentro
+        # il collo sono state confezionate in un prodotto finito (scatola
+        # da 9) ed è quello che va presentato a destino, non l'elenco
+        # delle paste. Si rende come un collo a SKU singolo — stesso
+        # blocco SKU+nome+quantità — senza barcode, perché il GTIN
+        # raccolto è quello delle paste, non della scatola.
+        if item.get("etichetta"):
+            etichetta = item["etichetta"]
+            nome_etichetta = (nomi_prodotto or {}).get(etichetta["sku"])
+            c.setFont("Helvetica-Bold", 15)
+            titolo = f"{etichetta['sku']} ({item['formato']})" if item["formato"] else etichetta["sku"]
+            c.drawString(margine, y, titolo)
+            y -= 7 * mm
+            if nome_etichetta:
+                for riga in _a_capo(c, nome_etichetta, "Helvetica", 12, larghezza_utile, righe_max=2):
+                    c.setFont("Helvetica", 12)
+                    c.drawString(margine, y, riga)
+                    y -= 5.5 * mm
+            y -= 2 * mm
+            c.setFont("Helvetica-Bold", 20)
+            c.drawString(margine, y, f"{etichetta['pezzi']} pz")
+            c.showPage()
+            continue
+
         if item.get("componenti"):
             componenti = item["componenti"]
             c.setFont("Helvetica-Bold", 11)

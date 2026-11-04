@@ -708,7 +708,8 @@ def revoke_session(token: str) -> None:
 
 
 def aggiungi_collo_misto(
-    order_number: str, formato: str | None, contenuto: list[dict], scatolone_indice: int | None = None
+    order_number: str, formato: str | None, contenuto: list[dict], scatolone_indice: int | None = None,
+    etichetta_sku: str | None = None, etichetta_pezzi: int | None = None,
 ) -> dict:
     """Registra un collo misto (più SKU nella stessa scatola interna,
     decisi a mano dal reparto — vedi sql/colli_misti_manuali.sql).
@@ -718,21 +719,31 @@ def aggiungi_collo_misto(
     sql/colli_misti_manuali_sfuso_indice.sql, 01/10/2026) — pezzi senza
     scatola interna che l'operatore vuole piazzare in uno scatolone
     specifico del risultato, invece di lasciarli alla cartonizzazione
-    automatica."""
+    automatica.
+
+    etichetta_sku/etichetta_pezzi: l'etichetta del collo riporta questo
+    SKU e questa quantità invece di "Collo misto" con l'elenco dei
+    componenti — serve quando le paste sfuse del contenuto sono state
+    confezionate in un prodotto finito (scatola da 9) che è ciò che va
+    presentato a destino. Vedi sql/colli_misti_etichetta_override.sql.
+    Il contenuto resta quello reale: è da lì che si calcola il peso."""
     with get_connection() as conn:
         row = conn.execute(
             """
-            INSERT INTO viscotta.colli_misti_manuali (order_number, formato, contenuto, scatolone_indice)
-            VALUES (%s, %s, %s, %s)
-            RETURNING id, order_number, formato, contenuto, scatolone_indice
+            INSERT INTO viscotta.colli_misti_manuali
+                (order_number, formato, contenuto, scatolone_indice, etichetta_sku, etichetta_pezzi)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            RETURNING id, order_number, formato, contenuto, scatolone_indice,
+                      etichetta_sku, etichetta_pezzi
             """,
-            (order_number, formato, Jsonb(contenuto), scatolone_indice),
+            (order_number, formato, Jsonb(contenuto), scatolone_indice, etichetta_sku, etichetta_pezzi),
         ).fetchone()
         conn.commit()
-    id_, order_number, formato, contenuto, scatolone_indice = row
+    id_, order_number, formato, contenuto, scatolone_indice, etichetta_sku, etichetta_pezzi = row
     return {
         "id": str(id_), "order_number": order_number, "formato": formato,
         "contenuto": contenuto, "scatolone_indice": scatolone_indice,
+        "etichetta_sku": etichetta_sku, "etichetta_pezzi": etichetta_pezzi,
     }
 
 
@@ -742,15 +753,20 @@ def fetch_colli_misti(order_number: str) -> list[dict]:
     with get_connection() as conn:
         rows = conn.execute(
             """
-            SELECT id, formato, contenuto, scatolone_indice FROM viscotta.colli_misti_manuali
+            SELECT id, formato, contenuto, scatolone_indice, etichetta_sku, etichetta_pezzi
+            FROM viscotta.colli_misti_manuali
             WHERE order_number = %s
             ORDER BY creata_at
             """,
             (order_number,),
         ).fetchall()
     return [
-        {"id": str(id_), "formato": formato, "contenuto": contenuto, "scatolone_indice": scatolone_indice}
-        for id_, formato, contenuto, scatolone_indice in rows
+        {
+            "id": str(id_), "formato": formato, "contenuto": contenuto,
+            "scatolone_indice": scatolone_indice,
+            "etichetta_sku": etichetta_sku, "etichetta_pezzi": etichetta_pezzi,
+        }
+        for id_, formato, contenuto, scatolone_indice, etichetta_sku, etichetta_pezzi in rows
     ]
 
 
@@ -765,7 +781,17 @@ def fetch_colli_misti_per_cartonize(order_number: str) -> list[dict] | None:
     """fetch_colli_misti già nel formato atteso da cartonize_order(...,
     colli_misti=...) — None se non ce ne sono, per passarlo direttamente."""
     colli_misti = [
-        {"formato": cm["formato"], "componenti": cm["contenuto"], "scatolone_indice": cm["scatolone_indice"]}
+        {
+            "formato": cm["formato"],
+            "componenti": cm["contenuto"],
+            "scatolone_indice": cm["scatolone_indice"],
+            # Override dell'etichetta (vedi
+            # sql/colli_misti_etichetta_override.sql): viaggia fino a
+            # labels.py attraverso la cartonizzazione, senza entrare nel
+            # calcolo del peso, che resta basato sui componenti reali.
+            "etichetta_sku": cm["etichetta_sku"],
+            "etichetta_pezzi": cm["etichetta_pezzi"],
+        }
         for cm in fetch_colli_misti(order_number)
     ]
     return colli_misti or None
