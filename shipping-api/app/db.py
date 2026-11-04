@@ -578,6 +578,71 @@ def fetch_elenco_spedizioni(data_da, data_a) -> list[dict]:
     return risultato
 
 
+def fetch_elenco_per_ordini(order_numbers: list[str]) -> list[dict]:
+    """Come fetch_elenco_spedizioni, ma su un elenco ESPLICITO di ordini
+    invece che su un intervallo di date. Serve quando i gruppi di uscita
+    non coincidono con le date del Portal: il piano di chiusura di
+    miniMRP (nota del 04/11/2026) raggruppa 26 ordini in tre uscite che
+    tagliano trasversalmente le `requested_delivery_date` registrate,
+    quindi i gruppi non sono ricavabili da una finestra temporale.
+
+    A differenza di fetch_elenco_spedizioni NON applica il filtro "in
+    prenotazione" (status='submitted' + crm_opportunity_id valorizzato):
+    gli ordini richiesti vengono restituiti comunque, con
+    `in_prenotazione` che dice se lo passano. Così un ordine che il
+    reparto deve spedire ma che sul Portal non è ancora una Opportunity
+    in CRM compare sul cartellone **segnalato**, invece di sparire senza
+    che nessuno se ne accorga — caso reale TUTTO PER LA CASA
+    (ORD-20261102-5007, crm_opportunity_id vuoto). L'ordine restituito
+    segue quello della lista in ingresso, che è l'ordine deciso a monte."""
+    with get_connection() as conn:
+        ordini = conn.execute(
+            """
+            SELECT o.id, o.order_number, c.company_name, o.requested_delivery_date,
+                   (o.status = 'submitted' AND o.crm_opportunity_id IS NOT NULL) AS in_prenotazione,
+                   o.status
+            FROM viscotta.orders o
+            JOIN viscotta.customers c ON c.id = o.customer_id
+            WHERE o.order_number = ANY(%s)
+            """,
+            (order_numbers,),
+        ).fetchall()
+
+        per_numero = {}
+        for order_id, order_number, cliente, data_consegna, in_prenotazione, status in ordini:
+            righe = conn.execute(
+                "SELECT sku, quantity FROM viscotta.order_items WHERE order_id = %s",
+                (order_id,),
+            ).fetchall()
+            colli = conn.execute(
+                "SELECT indice_collo FROM viscotta.colli_confermati WHERE order_number = %s",
+                (order_number,),
+            ).fetchall()
+            spedizione_row = conn.execute(
+                f"""
+                SELECT {_COLONNE_SPEDIZIONE} FROM viscotta.spedizioni
+                WHERE {_SPEDIZIONE_CONTIENE_ORDINE}
+                ORDER BY creata_at DESC
+                LIMIT 1
+                """,
+                (order_number, order_number),
+            ).fetchone()
+            per_numero[order_number] = {
+                "order_number": order_number,
+                "cliente": cliente,
+                "data_consegna": data_consegna.isoformat() if data_consegna else None,
+                "righe": [{"sku": sku, "qta": float(qta)} for sku, qta in righe],
+                "colli_confermati": {indice for (indice,) in colli},
+                "spedizione": _spedizione_da_riga(spedizione_row) if spedizione_row else None,
+                "in_prenotazione": bool(in_prenotazione),
+                "status": status,
+            }
+
+    # Gli ordini inesistenti non vengono inventati: restano fuori, e il
+    # chiamante li riconosce confrontando le lunghezze.
+    return [per_numero[n] for n in order_numbers if n in per_numero]
+
+
 def fetch_ultima_spedizione_per_ordine(order_number: str) -> dict | None:
     """Spedizione più recente per un ordine (per order_number possono
     esistere più righe nel tempo: una bozza cancellata e poi ricreata, un

@@ -511,6 +511,57 @@ class RigaElenco(BaseModel):
     # capofila, così il reparto vede che la merce parte già (sotto
     # un'altra spedizione) invece di credere che manchi.
     spedizione_capofila: str | None = None
+    # False se l'ordine NON passa il filtro "in prenotazione" del reparto
+    # (status submitted + Opportunity in CRM): valorizzato solo dalla
+    # vista per gruppi, dove un ordine fuori filtro va mostrato segnalato
+    # invece di sparire. Nella vista per date non capita: il filtro è
+    # nella query stessa.
+    in_prenotazione: bool = True
+
+
+@router.get("/spedizioni/elenco-per-ordini", response_model=list[RigaElenco])
+def elenco_per_ordini(order_numbers: str) -> list[RigaElenco]:
+    """Come /spedizioni/elenco ma su un elenco ESPLICITO di ordini
+    (separati da virgola), invece che su una finestra di date. Serve ai
+    cartelloni per gruppi di uscita, quando il raggruppamento deciso a
+    monte (piano di chiusura miniMRP) non coincide con le
+    requested_delivery_date registrate sul Portal e quindi non è
+    ricavabile da un intervallo.
+
+    Gli ordini che non passano il filtro "in prenotazione" sono
+    restituiti con in_prenotazione=false invece di essere esclusi: sul
+    cartellone vanno segnalati, non fatti sparire. Gli ordini inesistenti
+    non compaiono. Sola lettura, nessun effetto."""
+    numeri = [n.strip() for n in order_numbers.split(",") if n.strip()]
+    if not numeri:
+        raise HTTPException(status_code=422, detail="order_numbers vuoto")
+    if len(numeri) > 200:
+        raise HTTPException(status_code=422, detail="troppi ordini in una sola richiesta (max 200)")
+
+    righe = []
+    for ordine in db.fetch_elenco_per_ordini(numeri):
+        cartonizzazione = _cartonize_ordine_reale(ordine["order_number"], ordine["righe"])
+        n_colli = cartonizzazione["n_scatoloni"]
+        confermati = ordine["colli_confermati"]
+        spedizione = ordine["spedizione"]
+        righe.append(RigaElenco(
+            order_number=ordine["order_number"],
+            cliente=ordine["cliente"],
+            data_consegna=ordine.get("data_consegna"),
+            n_colli=n_colli,
+            colli_confermati=len(confermati),
+            colli_completo=n_colli > 0 and len(confermati) >= n_colli,
+            spedizione_stato=spedizione["stato"] if spedizione else "non_iniziata",
+            spedizione_id=spedizione["id"] if spedizione else None,
+            spedizione_capofila=(
+                spedizione["order_number"]
+                if spedizione and spedizione["order_number"] != ordine["order_number"]
+                else None
+            ),
+            in_prenotazione=ordine["in_prenotazione"],
+        ))
+    return righe
+
 
 
 @router.get("/spedizioni/elenco", response_model=list[RigaElenco])

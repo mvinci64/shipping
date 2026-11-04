@@ -4,7 +4,14 @@ import { StampaAutomatica } from "./StampaAutomatica";
 
 export const metadata = { title: "Cartellone spedizioni — VISCOTTA" };
 
-type Riga = { order_number: string; cliente: string; data_consegna: string | null };
+type Riga = {
+  order_number: string;
+  cliente: string;
+  data_consegna: string | null;
+  // false se l'ordine non passa il filtro "in prenotazione" del reparto:
+  // va mostrato SEGNALATO, non fatto sparire (vedi modalità gruppi).
+  in_prenotazione?: boolean;
+};
 
 // Tutta l'aritmetica sui giorni lavorativi lavora in UTC (parse e
 // serializzazione), per non sfasare di un giorno nei fusi avanti su UTC
@@ -87,7 +94,7 @@ function raggruppaPerCliente(righe: Riga[]): Invio[] {
   return [...perCliente].map(([cliente, ordini]) => ({ cliente, ordini }));
 }
 
-function Zona({ titolo, data, righe }: { titolo: string; data: string; righe: Riga[] }) {
+function Zona({ titolo, sottotitolo, righe }: { titolo: string; sottotitolo: string; righe: Riga[] }) {
   const invii = raggruppaPerCliente(righe);
   const conteggio =
     invii.length === righe.length
@@ -101,7 +108,7 @@ function Zona({ titolo, data, righe }: { titolo: string; data: string; righe: Ri
           {titolo}
         </span>
         <span className="text-sm font-semibold uppercase tracking-wide text-zinc-600 dark:text-zinc-400">
-          {data} — in partenza
+          {sottotitolo}
         </span>
         <span className="ml-auto font-mono text-sm text-zinc-600 dark:text-zinc-400">{conteggio}</span>
       </div>
@@ -130,6 +137,11 @@ function Zona({ titolo, data, righe }: { titolo: string; data: string; righe: Ri
                 {invio.ordini.map((o) => (
                   <div key={o.order_number}>
                     {o.order_number} · consegna {o.data_consegna ? formattaDataBreve(o.data_consegna) : "—"}
+                    {o.in_prenotazione === false && (
+                      <span className="ml-1 font-semibold uppercase text-red-700 dark:text-red-500">
+                        · da verificare sul portale
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>
@@ -169,7 +181,7 @@ function Foglio({
             foglio {intestazione.data} · l&apos;altro giorno è {altraData}
           </span>
         </div>
-        <Zona titolo={intestazione.data} data={intestazione.giorno} righe={righe} />
+        <Zona titolo={intestazione.data} sottotitolo={`${intestazione.giorno} — in partenza`} righe={righe} />
         <div className="flex justify-between border-t-2 border-zinc-900 pt-2 font-mono text-[11px] text-zinc-500 dark:border-zinc-100">
           <span>reparto logistica · VISCOTTA</span>
           <span>dati: ordini &quot;in prenotazione&quot;, partenza = consegna richiesta − 2 giorni lavorativi</span>
@@ -179,12 +191,164 @@ function Foglio({
   );
 }
 
+/** Numeri d'ordine da un campo incollato: separati da virgola, spazio o
+ *  andata a capo — il reparto li copia da una nota, non li digita a mano
+ *  in un formato preciso. */
+function numeriOrdine(testo: string | undefined): string[] {
+  return (testo || "")
+    .split(/[\s,;]+/)
+    .map((n) => n.trim())
+    .filter(Boolean);
+}
+
+/** Un foglio per GRUPPO di uscita: gli ordini arrivano da un elenco
+ *  esplicito, non dalle date. Nessun calcolo di partenza qui — il giorno
+ *  è un'etichetta libera, perché i gruppi del piano di chiusura possono
+ *  cadere anche di sabato/domenica come "pronto per la spedizione",
+ *  mentre il ritiro reale lo fissa il reparto. */
+async function CartelloneGruppi({
+  gruppi,
+}: {
+  gruppi: { ordini: string[]; etichetta?: string }[];
+}) {
+  const risultati = await Promise.all(
+    gruppi.map((g) =>
+      shippingClient
+        .GET("/spedizioni/elenco-per-ordini", {
+          params: { query: { order_numbers: g.ordini.join(",") } },
+        })
+        .catch((cause) => ({
+          data: undefined,
+          error: { detail: cause instanceof Error ? cause.message : String(cause) },
+        })),
+    ),
+  );
+
+  return (
+    <div className="flex flex-1 flex-col items-center gap-6 bg-zinc-50 pb-8 font-sans print:gap-0 print:bg-white print:pb-0 dark:bg-black">
+      <div className="flex w-full max-w-4xl flex-col gap-3 px-8 py-8 print:hidden">
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-semibold tracking-tight text-black dark:text-zinc-50">
+            Cartellone per gruppi di uscita
+          </h1>
+          <div className="flex items-center gap-4">
+            <Link href="/spedizioni/cartellone" className="text-sm text-zinc-500 hover:underline dark:text-zinc-400">
+              Torna alle date
+            </Link>
+            <StampaAutomatica />
+          </div>
+        </div>
+        <p className="text-xs text-zinc-600 dark:text-zinc-400">
+          Un foglio A4 per gruppo, dagli ordini indicati — indipendente dalle date di consegna
+          registrate sul portale.
+        </p>
+      </div>
+
+      {gruppi.map((g, i) => {
+        const righe = risultati[i].data;
+        const mancanti = righe
+          ? g.ordini.filter((n) => !righe.some((r) => r.order_number === n))
+          : [];
+        return (
+          <FoglioGruppo
+            key={i}
+            titolo={g.etichetta || `Gruppo ${i + 1}`}
+            righe={righe ?? []}
+            mancanti={mancanti}
+            errore={righe ? null : "Impossibile leggere gli ordini del gruppo"}
+            interrompiPagina={i < gruppi.length - 1}
+          />
+        );
+      })}
+
+      <style>{`
+        @media print {
+          @page { size: A4; margin: 10mm; }
+          html, body { background: #fff; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+function FoglioGruppo({
+  titolo,
+  righe,
+  mancanti,
+  errore,
+  interrompiPagina,
+}: {
+  titolo: string;
+  righe: Riga[];
+  mancanti: string[];
+  errore: string | null;
+  interrompiPagina: boolean;
+}) {
+  return (
+    <div
+      className={`w-full max-w-[210mm] border-2 border-zinc-900 bg-white p-8 print:w-auto print:border-0 print:p-0 dark:border-zinc-100 dark:bg-zinc-950 print:dark:bg-white${
+        interrompiPagina ? " print:[break-after:page]" : ""
+      }`}
+    >
+      <div className="flex min-h-[250mm] flex-col gap-8 print:min-h-0">
+        <div className="flex items-baseline justify-between border-b-[3px] border-zinc-900 pb-4 dark:border-zinc-100 print:border-zinc-900">
+          <h2 className="font-mono text-2xl font-extrabold uppercase tracking-tight text-zinc-900 print:text-zinc-900 dark:text-zinc-50">
+            Gruppo di uscita
+          </h2>
+          <span className="font-mono text-sm text-zinc-500">{titolo}</span>
+        </div>
+
+        <Zona titolo={titolo} sottotitolo="pronto per la spedizione" righe={righe} />
+
+        {errore && <p className="text-sm text-red-700 dark:text-red-400">{errore}</p>}
+        {mancanti.length > 0 && (
+          <p className="border-2 border-red-700 p-2 text-xs font-semibold text-red-700 dark:text-red-500">
+            NON TROVATI a sistema: {mancanti.join(", ")} — da verificare prima di spedire.
+          </p>
+        )}
+
+        <div className="flex justify-between border-t-2 border-zinc-900 pt-2 font-mono text-[11px] text-zinc-500 dark:border-zinc-100">
+          <span>reparto logistica · VISCOTTA</span>
+          <span>gruppo di uscita deciso a monte, non dalle date del portale</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 export default async function Cartellone({
   searchParams,
 }: {
-  searchParams: Promise<{ giorno1?: string; giorno2?: string }>;
+  searchParams: Promise<{
+    giorno1?: string;
+    giorno2?: string;
+    // Modalità GRUPPI: elenchi espliciti di ordini, uno per foglio, con
+    // un'etichetta libera come titolo. Serve quando il raggruppamento
+    // deciso a monte (piano di chiusura miniMRP) non coincide con le date
+    // di consegna registrate sul Portal, e quindi non è ricavabile da
+    // una finestra temporale — nota del 04/11/2026, 26 ordini in tre
+    // uscite che tagliano trasversalmente le requested_delivery_date.
+    gruppo1?: string;
+    gruppo2?: string;
+    gruppo3?: string;
+    etichetta1?: string;
+    etichetta2?: string;
+    etichetta3?: string;
+  }>;
 }) {
   const params = await searchParams;
+
+  const gruppi = [
+    { ordini: numeriOrdine(params.gruppo1), etichetta: params.etichetta1 },
+    { ordini: numeriOrdine(params.gruppo2), etichetta: params.etichetta2 },
+    { ordini: numeriOrdine(params.gruppo3), etichetta: params.etichetta3 },
+  ].filter((g) => g.ordini.length > 0);
+
+  if (gruppi.length > 0) {
+    return <CartelloneGruppi gruppi={gruppi} />;
+  }
+
   const defaultGiorni = prossimiDueGiorniLavorativi();
   const giorno1 = params.giorno1 || defaultGiorni[0];
   const giorno2 = params.giorno2 || defaultGiorni[1];
@@ -252,6 +416,49 @@ export default async function Cartellone({
             {typeof error?.detail === "string" ? error.detail : "errore sconosciuto"}).
           </div>
         )}
+
+        {/* Modalità gruppi: quando il raggruppamento arriva deciso da
+            fuori (piano di chiusura miniMRP) e non coincide con le date
+            di consegna sul portale, le date non bastano a ricostruirlo.
+            Qui si incollano direttamente gli ordini di ogni gruppo. */}
+        <details className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
+          <summary className="cursor-pointer text-sm font-medium text-zinc-900 dark:text-zinc-100">
+            Cartellone per gruppi di uscita
+          </summary>
+          <p className="mt-2 text-xs text-zinc-600 dark:text-zinc-400">
+            Da usare quando i gruppi sono decisi a monte e non corrispondono alle date di consegna
+            registrate. Incolla i numeri d&apos;ordine di ciascun gruppo (separati da virgola, spazio
+            o andata a capo): esce un foglio A4 per gruppo. Gli ordini non trovati, o che non
+            risultano &quot;in prenotazione&quot;, vengono segnalati sul foglio invece di sparire.
+          </p>
+          <form className="mt-3 flex flex-col gap-3">
+            {[1, 2, 3].map((n) => (
+              <div key={n} className="flex flex-col gap-1">
+                <label className="flex flex-col gap-1 text-sm text-zinc-700 dark:text-zinc-300">
+                  Gruppo {n} — titolo sul foglio
+                  <input
+                    type="text"
+                    name={`etichetta${n}`}
+                    placeholder={`es. sab 07-11`}
+                    className="rounded border border-zinc-300 bg-white px-2 py-1 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+                  />
+                </label>
+                <textarea
+                  name={`gruppo${n}`}
+                  rows={2}
+                  placeholder="ORD-… , ORD-… , IMPORT-DMLAB-…"
+                  className="rounded border border-zinc-300 bg-white px-2 py-1 font-mono text-xs text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+                />
+              </div>
+            ))}
+            <button
+              type="submit"
+              className="self-start rounded bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+            >
+              Genera cartelloni per gruppo
+            </button>
+          </form>
+        </details>
       </div>
 
       {/* Un foglio A4 per giorno di partenza: i gruppi reali arrivano a

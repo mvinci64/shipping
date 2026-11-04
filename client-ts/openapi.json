@@ -804,6 +804,50 @@
         }
       }
     },
+    "/spedizioni/elenco-per-ordini": {
+      "get": {
+        "summary": "Elenco Per Ordini",
+        "description": "Come /spedizioni/elenco ma su un elenco ESPLICITO di ordini\n(separati da virgola), invece che su una finestra di date. Serve ai\ncartelloni per gruppi di uscita, quando il raggruppamento deciso a\nmonte (piano di chiusura miniMRP) non coincide con le\nrequested_delivery_date registrate sul Portal e quindi non è\nricavabile da un intervallo.\n\nGli ordini che non passano il filtro \"in prenotazione\" sono\nrestituiti con in_prenotazione=false invece di essere esclusi: sul\ncartellone vanno segnalati, non fatti sparire. Gli ordini inesistenti\nnon compaiono. Sola lettura, nessun effetto.",
+        "operationId": "elenco_per_ordini_spedizioni_elenco_per_ordini_get",
+        "parameters": [
+          {
+            "name": "order_numbers",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Order Numbers"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RigaElenco"
+                  },
+                  "title": "Response Elenco Per Ordini Spedizioni Elenco Per Ordini Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/spedizioni/elenco": {
       "get": {
         "summary": "Elenco Spedizioni",
@@ -1868,6 +1912,11 @@
               }
             ],
             "title": "Spedizione Capofila"
+          },
+          "in_prenotazione": {
+            "type": "boolean",
+            "title": "In Prenotazione",
+            "default": true
           }
         },
         "type": "object",

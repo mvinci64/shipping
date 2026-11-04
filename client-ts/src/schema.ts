@@ -405,6 +405,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/spedizioni/elenco-per-ordini": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Elenco Per Ordini
+         * @description Come /spedizioni/elenco ma su un elenco ESPLICITO di ordini
+         *     (separati da virgola), invece che su una finestra di date. Serve ai
+         *     cartelloni per gruppi di uscita, quando il raggruppamento deciso a
+         *     monte (piano di chiusura miniMRP) non coincide con le
+         *     requested_delivery_date registrate sul Portal e quindi non è
+         *     ricavabile da un intervallo.
+         *
+         *     Gli ordini che non passano il filtro "in prenotazione" sono
+         *     restituiti con in_prenotazione=false invece di essere esclusi: sul
+         *     cartellone vanno segnalati, non fatti sparire. Gli ordini inesistenti
+         *     non compaiono. Sola lettura, nessun effetto.
+         */
+        get: operations["elenco_per_ordini_spedizioni_elenco_per_ordini_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/spedizioni/elenco": {
         parameters: {
             query?: never;
@@ -838,6 +868,11 @@ export interface components {
             spedizione_id: string | null;
             /** Spedizione Capofila */
             spedizione_capofila?: string | null;
+            /**
+             * In Prenotazione
+             * @default true
+             */
+            in_prenotazione: boolean;
         };
         /** RigaOrdine */
         RigaOrdine: {
@@ -1604,6 +1639,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrdineConsolidabile"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    elenco_per_ordini_spedizioni_elenco_per_ordini_get: {
+        parameters: {
+            query: {
+                order_numbers: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RigaElenco"][];
                 };
             };
             /** @description Validation Error */
