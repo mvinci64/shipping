@@ -293,12 +293,15 @@ function FoglioGruppo({
       <div className="flex min-h-[250mm] flex-col gap-8 print:min-h-0">
         <div className="flex items-baseline justify-between border-b-[3px] border-zinc-900 pb-4 dark:border-zinc-100 print:border-zinc-900">
           <h2 className="font-mono text-2xl font-extrabold uppercase tracking-tight text-zinc-900 print:text-zinc-900 dark:text-zinc-50">
-            Gruppo di uscita
+            Spedizioni del giorno
           </h2>
           <span className="font-mono text-sm text-zinc-500">{titolo}</span>
         </div>
 
-        <Zona titolo={titolo} sottotitolo="pronto per la spedizione" righe={righe} />
+        {/* "in partenza" come nei cartelloni per data: il reparto legge il
+            foglio come il giorno in cui la merce parte, ed è così che
+            l'utente vuole intestarli (04/11/2026). */}
+        <Zona titolo={titolo} sottotitolo="in partenza" righe={righe} />
 
         {errore && <p className="text-sm text-red-700 dark:text-red-400">{errore}</p>}
         {mancanti.length > 0 && (
