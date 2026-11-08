@@ -17,6 +17,9 @@ dist/
 # Output generati dal prototipo
 prototype/out/
 
+# PDF generati (etichette, cartelloni): roba di giornata, non di repo
+shipping-api/tmp_out/
+
 # macOS / Office
 .DS_Store
 ~$*
