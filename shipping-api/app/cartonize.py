@@ -300,8 +300,14 @@ def collo_misto_box(formato: str | None, componenti: list[dict], etichetta: dict
     return (formato, None, pezzi_totali, peso, componenti, etichetta)
 
 
-def cartonize_order(rows, colli_misti: list[dict] | None = None):
+def cartonize_order(rows, colli_misti: list[dict] | None = None, kit_senza_distinta: set[str] | None = None):
     """Righe di un ordine (dict con sku, qta) → risultato completo.
+    kit_senza_distinta (opzionale): SKU che il miniMRP non esplode perché
+    senza distinta base (vedi db.fetch_kit_senza_distinta) — qui non
+    cambiano la cartonizzazione, finiscono in "kit_senza_distinta" perché
+    chi stampa li segnali: due di loro (SCATRM05A, SCATRS05A) sono censiti
+    in CONFEZIONI, quindi altrimenti il piano uscirebbe pulito e il reparto
+    imballerebbe una scatola che in produzione non è mai stata riempita.
     colli_misti (opzionale): colli WP40/WP50 con più SKU decisi a mano
     dall'operatore (vedi sql/colli_misti_manuali.sql), ciascuno
     {"formato": ..., "componenti": [{"sku": ..., "pezzi": ...}, ...]}. Le
@@ -341,13 +347,17 @@ def cartonize_order(rows, colli_misti: list[dict] | None = None):
         else:
             boxes += [(fmt, sku, pezzi, peso) for fmt, pezzi, peso in line_boxes]
 
-    # Gruppi sfusi "a scatolone forzato" (formato None + scatolone_indice):
+    # Colli "a scatolone forzato" (scatolone_indice valorizzato): gruppi
+    # sfusi (formato None) oppure scatole interne WP50/WP40 che l'operatore
+    # vuole in uno scatolone preciso — serve anche per fondere due
+    # scatoloni del risultato automatico in uno (caso reale ALIMENTAZIONE
+    # B.M. di Bergomas, ORD-20260628-7898, 09/11/2026: 2 e 3 uniti):
     # non entrano nel first-fit automatico di pack_cartons, vengono inseriti
     # a colpo sicuro nello scatolone indicato dall'operatore DOPO che gli
     # altri colli (automatici + misti normali) hanno già determinato quanti
     # scatoloni servono — l'operatore ha verificato fisicamente che ci
     # stanno, anche se l'algoritmo li considererebbe "pieni" per posti.
-    colli_misti_forzati = [cm for cm in colli_misti if cm.get("formato") is None and cm.get("scatolone_indice")]
+    colli_misti_forzati = [cm for cm in colli_misti if cm.get("scatolone_indice")]
     for cm in colli_misti:
         if cm not in colli_misti_forzati:
             boxes.append(collo_misto_box(cm["formato"], cm["componenti"], _etichetta_di(cm)))
@@ -358,22 +368,37 @@ def cartonize_order(rows, colli_misti: list[dict] | None = None):
         indice = cm["scatolone_indice"] - 1
         while len(cartons) <= indice:
             cartons.append({"posti_usati": 0, "contenuto": [], "peso_g": TARA_SCATOLONE_G + CARTA_RIEMPIMENTO_G})
+        formato = cm.get("formato")
         _, _, pezzi_totali, peso, componenti, etichetta = collo_misto_box(
-            None, cm["componenti"], _etichetta_di(cm)
+            formato, cm["componenti"], _etichetta_di(cm)
         )
         entry = {
-            "formato": None, "sku": None, "pezzi": pezzi_totali,
+            "formato": formato, "sku": None, "pezzi": pezzi_totali,
             "peso_g": peso, "componenti": componenti,
         }
         if etichetta:
             entry["etichetta"] = etichetta
         cartons[indice]["contenuto"].append(entry)
         cartons[indice]["peso_g"] += peso
+        # Con un formato (WP50/WP40) il collo forzato è una scatola interna
+        # vera: occupa il suo posto e ha la sua tara (la mette
+        # collo_misto_box). I posti possono così superare POSTI_SCATOLONE —
+        # è il senso del forzamento: l'operatore ha verificato fisicamente
+        # che ci sta, e il peso deve restare quello reale per DHL.
+        cartons[indice]["posti_usati"] += POSTI.get(formato, 0)
 
     return {
         "scatoloni": cartons,
         "n_scatoloni": len(cartons),
-        "posti_liberi_ultimo": (POSTI_SCATOLONE - cartons[-1]["posti_usati"]) if cartons else 0,
+        # mai negativo: un collo forzato può portare lo scatolone oltre i 6 posti
+        "posti_liberi_ultimo": max(0, POSTI_SCATOLONE - cartons[-1]["posti_usati"]) if cartons else 0,
         "peso_totale_kg": round(sum(c["peso_g"] for c in cartons) / 1000, 2),
         "non_censiti": non_censiti,
+        "kit_senza_distinta": [
+            {"sku": sku, "qta": qta}
+            for sku, qta in sorted(
+                (r["sku"].strip(), int(float(r["qta"]))) for r in rows
+                if r["sku"].strip() in (kit_senza_distinta or set())
+            )
+        ],
     }

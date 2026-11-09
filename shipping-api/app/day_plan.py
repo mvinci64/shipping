@@ -17,11 +17,15 @@ HEADER_H_MM = 7   # striscia riservata alla data pagina, fuori dai quadranti
 FOOTER_H_MM = 8   # striscia riservata a "Totale" + disclaimer, dentro ogni quadrante
 
 
-def _draw_quadrant(c, x0, y0, w, h, mm, ordine: dict):
+def _draw_quadrant(c, x0, y0, w, h, mm, ordine: dict, kit_senza_distinta: set[str] | None = None):
     """Disegna il piano di un ordine dentro il rettangolo (x0,y0,w,h) — origine
     in basso a sinistra del quadrante. Interrompe il disegno (con '…') se il
     contenuto non entra, invece di scrivere fuori dal quadrante."""
-    result = cartonize_order(ordine["righe"], colli_misti=db.fetch_colli_misti_per_cartonize(ordine["order_number"]))
+    result = cartonize_order(
+        ordine["righe"],
+        colli_misti=db.fetch_colli_misti_per_cartonize(ordine["order_number"]),
+        kit_senza_distinta=kit_senza_distinta,
+    )
     y_top = y0 + h - MARGIN_MM * mm
     y_bottom = y0 + (MARGIN_MM + FOOTER_H_MM) * mm
     x = x0 + MARGIN_MM * mm
@@ -64,6 +68,23 @@ def _draw_quadrant(c, x0, y0, w, h, mm, ordine: dict):
             c.drawString(x + 2 * mm, y, descrizione)
             y -= 3.5 * mm
 
+    # Kit senza distinta base: in produzione non sono stati prodotti (vedi
+    # db.fetch_kit_senza_distinta). Vanno prima dei non censiti perché qui
+    # il rischio è l'opposto: la scatola È censita, il piano esce pulito e
+    # senza questo avviso il reparto imballerebbe un collo che nessuno ha
+    # riempito.
+    if result["kit_senza_distinta"]:
+        y -= 1.5 * mm
+        c.setFont("Helvetica-Bold", 7.5)
+        c.drawString(x, y, "FERMARSI — composizione non definita, NON prodotti:")
+        y -= 3.5 * mm
+        c.setFont("Helvetica-Bold", 7.5)
+        for kit in result["kit_senza_distinta"]:
+            if not riga_disponibile(3.5):
+                break
+            c.drawString(x + 2 * mm, y, f"{kit['qta']}x {kit['sku']} — chiedere prima di imballare")
+            y -= 3.5 * mm
+
     if result["non_censiti"]:
         y -= 1.5 * mm
         c.setFont("Helvetica-BoldOblique", 7.5)
@@ -86,6 +107,10 @@ def make_day_plan_pdf(data_consegna_iso: str, ordini: list[dict]) -> bytes:
     from reportlab.lib.units import mm as mm_unit
     from reportlab.pdfgen import canvas
 
+    # una lettura per PDF, non per ordine: le distinte le chiude l'utente
+    # nel tempo, quindi non si può congelare in una costante
+    kit_senza_distinta = db.fetch_kit_senza_distinta()
+
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=(PAGE_W_MM * mm_unit, PAGE_H_MM * mm_unit))
     W, H = PAGE_W_MM * mm_unit, PAGE_H_MM * mm_unit
@@ -107,7 +132,7 @@ def make_day_plan_pdf(data_consegna_iso: str, ordini: list[dict]) -> bytes:
         c.setDash()
 
         for (qx, qy), ordine in zip(quadranti, gruppo):
-            _draw_quadrant(c, qx, qy, half_w, half_h, mm_unit, ordine)
+            _draw_quadrant(c, qx, qy, half_w, half_h, mm_unit, ordine, kit_senza_distinta)
 
         c.showPage()
 

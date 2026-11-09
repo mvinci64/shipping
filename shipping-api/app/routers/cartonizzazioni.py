@@ -274,8 +274,10 @@ def rimuovi_collo_omaggio(collo_id: str) -> None:
 class RichiestaColloMisto(BaseModel):
     # None = gruppo sfuso a scatolone forzato (vedi
     # sql/colli_misti_manuali_sfuso_indice.sql, 01/10/2026) — richiede
-    # scatolone_indice. "WP50"/"WP40" = collo misto normale (scatola
-    # interna), scatolone_indice non si applica.
+    # scatolone_indice. "WP50"/"WP40" = scatola interna: senza
+    # scatolone_indice va alla cartonizzazione automatica, con
+    # scatolone_indice viene forzata in quello scatolone (fusione di due
+    # scatoloni, 09/11/2026).
     formato: str | None = None
     componenti: list[ComponenteCollo]
     scatolone_indice: int | None = None
@@ -316,8 +318,9 @@ def aggiungi_collo_misto(order_number: str, richiesta: RichiestaColloMisto) -> C
         raise HTTPException(status_code=422, detail="formato deve essere 'WP50', 'WP40' o assente (gruppo sfuso)")
     if richiesta.formato is None and not richiesta.scatolone_indice:
         raise HTTPException(status_code=422, detail="scatolone_indice obbligatorio per un gruppo sfuso (formato assente)")
-    if richiesta.formato is not None and richiesta.scatolone_indice:
-        raise HTTPException(status_code=422, detail="scatolone_indice si applica solo ai gruppi sfusi (formato assente)")
+    # formato + scatolone_indice è lecito dal 09/11/2026: scatola interna
+    # vera piazzata in uno scatolone preciso, per fondere due scatoloni
+    # (ALIMENTAZIONE B.M., ORD-20260628-7898).
     if (richiesta.etichetta_sku is None) != (richiesta.etichetta_pezzi is None):
         raise HTTPException(
             status_code=422,

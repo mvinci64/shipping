@@ -943,3 +943,25 @@ def fetch_spedizioni_tracciabili(data_da, data_a) -> list[dict]:
         }
         for order_number, cliente, stato, tracking, prg, tracking_url, data_consegna in rows
     ]
+
+
+def fetch_kit_senza_distinta() -> set[str]:
+    """SKU attivi con modo_gestione='kit' ma SENZA distinta base — i kit che
+    il miniMRP non riesce a esplodere: la riga resta in sospeso nel piano di
+    produzione e la merce non viene prodotta. Alcuni di questi (SCATRM05A,
+    SCATRS05A) sono invece censiti in cartonize.CONFEZIONI, quindi senza
+    questo controllo il piano del giorno escirebbe pulito e il reparto
+    imballerebbe una scatola che nessuno ha riempito. Letto a ogni stampa
+    perché le distinte le chiude l'utente nel tempo (09/11/2026)."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT k.codice
+            FROM viscotta.prodotti k
+            LEFT JOIN viscotta.distinta_base d ON d.id_prodotto = k.id
+            WHERE k.modo_gestione = 'kit' AND k.attivo
+            GROUP BY k.codice
+            HAVING count(d.id_componente) = 0
+            """
+        ).fetchall()
+    return {codice for (codice,) in rows}
