@@ -4,6 +4,7 @@ import { AzioneForm } from "./AzioneForm";
 import {
   annullaBozzaAction,
   creaBozzaAction,
+  registraRitiroAManoAction,
   creaBozzaConsolidataAction,
   confermaSpedizioneAction,
   richiediPickupAction,
@@ -168,6 +169,33 @@ export default async function DettaglioSpedizione({
                 />
               </div>
 
+              {/* Ritiro a mano: il cliente passa a prendere la merce, non
+                  c'è niente da spedire. Serve comunque registrarlo, o
+                  l'ordine resta "non iniziato" per sempre. */}
+              <div className="rounded border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-950">
+                <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-100">Ritiro a mano</h3>
+                <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
+                  Il cliente ritira la merce in sede: nessuna spedizione DHL, nessuna etichetta corriere,
+                  nessun costo. L&apos;ordine viene registrato come ritirato, con i pesi della
+                  cartonizzazione.
+                </p>
+                <AzioneForm
+                  action={registraRitiroAManoAction.bind(null, order_number)}
+                  etichetta="Marca come ritirato a mano"
+                  classi="mt-1 bg-emerald-700 text-white hover:bg-emerald-800"
+                >
+                  {!collliCompleti && (
+                    <label className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400">
+                      <input type="checkbox" name="colli_non_confermati_ok" className="mt-0.5" />
+                      <span>
+                        I colli non sono tutti confermati a fine linea ({colli.data?.confermati.length ?? 0} su{" "}
+                        {colli.data?.n_totale ?? 0}). Spunta solo se la merce è già stata ritirata.
+                      </span>
+                    </label>
+                  )}
+                </AzioneForm>
+              </div>
+
               {/* Consolidamento: compare solo quando questo cliente ha
                   altri ordini in partenza lo stesso giorno, cioè quando
                   spedirli separatamente significherebbe pagare due
@@ -291,6 +319,14 @@ export default async function DettaglioSpedizione({
 
           {spedizione.data && stato === "ritirata" && (
             <div className="mt-3 flex flex-col gap-2">
+              {spedizione.data.corriere === "ritiro_a_mano" ? (
+                <p className="text-sm text-emerald-700 dark:text-emerald-400">
+                  Ritirata a mano dal cliente — nessun corriere, nessuna etichetta, nessun tracking.
+                  Peso uscito: {spedizione.data.pesi_scatoloni_kg.reduce((a, b) => a + b, 0).toFixed(2)} kg
+                  in {spedizione.data.pesi_scatoloni_kg.length}{" "}
+                  {spedizione.data.pesi_scatoloni_kg.length === 1 ? "collo" : "colli"}.
+                </p>
+              ) : (
               <p className="text-sm text-emerald-700 dark:text-emerald-400">
                 Ritirata — tracking {spedizione.data.shipment_tracking_number ?? "—"}
                 {spedizione.data.tracking_url && (
@@ -305,6 +341,8 @@ export default async function DettaglioSpedizione({
                 )}
                 {" "}— conferma ritiro {spedizione.data.dispatch_confirmation_number ?? "—"}
               </p>
+              )}
+              {spedizione.data.corriere !== "ritiro_a_mano" && (
               <a
                 href={`/spedizioni/${order_number}/etichetta-corriere`}
                 target="_blank"
@@ -312,6 +350,7 @@ export default async function DettaglioSpedizione({
               >
                 Stampa etichetta corriere
               </a>
+              )}
             </div>
           )}
 

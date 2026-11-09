@@ -381,6 +381,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/spedizioni/ritiro-a-mano/{order_number}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Registra Ritiro A Mano
+         * @description Registra l'uscita della merce SENZA corriere: il cliente passa a
+         *     ritirarla in sede (caso reale UNIGROUP S.P.A., 09/11/2026). Nessuna
+         *     chiamata DHL di nessun tipo — né quotazione né creazione né pickup —
+         *     quindi nessun costo e niente da confermare in due passi: la riga nasce
+         *     già in stato 'ritirata' con corriere 'ritiro_a_mano' (vedi
+         *     sql/spedizioni_ritiro_a_mano.sql).
+         *
+         *     Serve comunque una riga di spedizione: senza, l'ordine resta per
+         *     sempre "non iniziato" nell'elenco, indistinguibile da quelli ancora
+         *     da lavorare. I pesi vengono dalla cartonizzazione, così il peso
+         *     uscito dalla sede resta registrato anche senza corriere.
+         *
+         *     colli_non_confermati_ok: il gate sui colli confermati a fine linea
+         *     vale anche qui (non si dichiara uscita merce che è ancora sul tavolo),
+         *     ma a differenza della conferma DHL è superabile: quando la merce è
+         *     già stata caricata e nessuno ha scansionato i colli, il fatto è
+         *     avvenuto e registrarlo è meglio che lasciare l'ordine aperto. Va
+         *     chiesto esplicitamente, non è il default.
+         */
+        post: operations["registra_ritiro_a_mano_spedizioni_ritiro_a_mano__order_number__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/spedizioni/consolidabili/{order_number}": {
         parameters: {
             query?: never;
@@ -1598,6 +1635,43 @@ export interface operations {
         requestBody?: {
             content: {
                 "application/json": components["schemas"]["Body_crea_bozza_spedizione_spedizioni_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpedizioneResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    registra_ritiro_a_mano_spedizioni_ritiro_a_mano__order_number__post: {
+        parameters: {
+            query?: {
+                colli_non_confermati_ok?: boolean;
+            };
+            header?: never;
+            path: {
+                order_number: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": string[] | null;
             };
         };
         responses: {

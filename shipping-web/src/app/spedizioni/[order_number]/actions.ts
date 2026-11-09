@@ -115,3 +115,22 @@ export async function richiediPickupAction(
   revalidatePath(`/spedizioni/${orderNumber}`);
   return { errore: null };
 }
+
+// Nessun effetto reale sul corriere, perché non c'è nessun corriere: il
+// cliente passa a ritirare la merce in sede e l'ordine va comunque
+// chiuso, altrimenti resta per sempre "non iniziato" nell'elenco (vedi
+// sql/spedizioni_ritiro_a_mano.sql). La riga nasce già 'ritirata'.
+// La checkbox serve quando la merce è già stata caricata senza che
+// nessuno abbia scansionato i colli: il backend rifiuta con 409 se non
+// glielo si dice esplicitamente.
+export async function registraRitiroAManoAction(
+  orderNumber: string, _prev: StatoAzione, formData: FormData,
+): Promise<StatoAzione> {
+  const forza = formData.get("colli_non_confermati_ok") === "on";
+  const { error } = await shippingClient.POST("/spedizioni/ritiro-a-mano/{order_number}", {
+    params: { path: { order_number: orderNumber }, query: { colli_non_confermati_ok: forza } },
+  });
+  if (error) return { errore: messaggioErrore(error) };
+  revalidatePath(`/spedizioni/${orderNumber}`);
+  return { errore: null };
+}

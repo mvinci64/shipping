@@ -760,6 +760,76 @@
         }
       }
     },
+    "/spedizioni/ritiro-a-mano/{order_number}": {
+      "post": {
+        "summary": "Registra Ritiro A Mano",
+        "description": "Registra l'uscita della merce SENZA corriere: il cliente passa a\nritirarla in sede (caso reale UNIGROUP S.P.A., 09/11/2026). Nessuna\nchiamata DHL di nessun tipo — né quotazione né creazione né pickup —\nquindi nessun costo e niente da confermare in due passi: la riga nasce\ngià in stato 'ritirata' con corriere 'ritiro_a_mano' (vedi\nsql/spedizioni_ritiro_a_mano.sql).\n\nServe comunque una riga di spedizione: senza, l'ordine resta per\nsempre \"non iniziato\" nell'elenco, indistinguibile da quelli ancora\nda lavorare. I pesi vengono dalla cartonizzazione, così il peso\nuscito dalla sede resta registrato anche senza corriere.\n\ncolli_non_confermati_ok: il gate sui colli confermati a fine linea\nvale anche qui (non si dichiara uscita merce che è ancora sul tavolo),\nma a differenza della conferma DHL è superabile: quando la merce è\ngià stata caricata e nessuno ha scansionato i colli, il fatto è\navvenuto e registrarlo è meglio che lasciare l'ordine aperto. Va\nchiesto esplicitamente, non è il default.",
+        "operationId": "registra_ritiro_a_mano_spedizioni_ritiro_a_mano__order_number__post",
+        "parameters": [
+          {
+            "name": "order_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Order Number"
+            }
+          },
+          {
+            "name": "colli_non_confermati_ok",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Colli Non Confermati Ok"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Ordini Aggregati"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpedizioneResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/spedizioni/consolidabili/{order_number}": {
       "get": {
         "summary": "Ordini Consolidabili",

@@ -470,6 +470,65 @@ def crea_bozza_spedizione(
     return SpedizioneResponse(**bozza, contrassegno_eur=_contrassegno_totale(tutti_gli_ordini))
 
 
+@router.post("/spedizioni/ritiro-a-mano/{order_number}", response_model=SpedizioneResponse)
+def registra_ritiro_a_mano(
+    order_number: str,
+    ordini_aggregati: list[str] | None = None,
+    colli_non_confermati_ok: bool = False,
+) -> SpedizioneResponse:
+    """Registra l'uscita della merce SENZA corriere: il cliente passa a
+    ritirarla in sede (caso reale UNIGROUP S.P.A., 09/11/2026). Nessuna
+    chiamata DHL di nessun tipo — né quotazione né creazione né pickup —
+    quindi nessun costo e niente da confermare in due passi: la riga nasce
+    già in stato 'ritirata' con corriere 'ritiro_a_mano' (vedi
+    sql/spedizioni_ritiro_a_mano.sql).
+
+    Serve comunque una riga di spedizione: senza, l'ordine resta per
+    sempre "non iniziato" nell'elenco, indistinguibile da quelli ancora
+    da lavorare. I pesi vengono dalla cartonizzazione, così il peso
+    uscito dalla sede resta registrato anche senza corriere.
+
+    colli_non_confermati_ok: il gate sui colli confermati a fine linea
+    vale anche qui (non si dichiara uscita merce che è ancora sul tavolo),
+    ma a differenza della conferma DHL è superabile: quando la merce è
+    già stata caricata e nessuno ha scansionato i colli, il fatto è
+    avvenuto e registrarlo è meglio che lasciare l'ordine aperto. Va
+    chiesto esplicitamente, non è il default."""
+    aggregati = ordini_aggregati or []
+    if aggregati:
+        _valida_consolidamento(order_number, aggregati)
+
+    tutti_gli_ordini = [order_number, *aggregati]
+    for ordine_numero in tutti_gli_ordini:
+        esistente = db.fetch_ultima_spedizione_per_ordine(ordine_numero)
+        if esistente is not None:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"L'ordine {ordine_numero} ha già una spedizione in stato "
+                    f"'{esistente['stato']}' (corriere {esistente['corriere']}): "
+                    "un ritiro a mano si registra solo su un ordine senza spedizione"
+                ),
+            )
+        if not colli_non_confermati_ok:
+            stato_colli = _stato_colli(ordine_numero)
+            if not stato_colli.completo:
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        f"Colli non ancora tutti confermati a fine linea per l'ordine "
+                        f"{ordine_numero}: mancano {stato_colli.mancanti} su {stato_colli.n_totale}. "
+                        "Se la merce è già stata ritirata, ripetere con colli_non_confermati_ok=true"
+                    ),
+                )
+
+    pesi_kg, _riferimenti = _pesi_e_riferimenti(tutti_gli_ordini)
+    spedizione = db.crea_spedizione_ritiro_a_mano(
+        order_number=order_number, pesi_scatoloni_kg=pesi_kg, ordini_aggregati=aggregati,
+    )
+    return SpedizioneResponse(**spedizione, contrassegno_eur=_contrassegno_totale(tutti_gli_ordini))
+
+
 class OrdineConsolidabile(BaseModel):
     order_number: str
     data_consegna: str | None

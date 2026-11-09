@@ -965,3 +965,32 @@ def fetch_kit_senza_distinta() -> set[str]:
             """
         ).fetchall()
     return {codice for (codice,) in rows}
+
+
+def crea_spedizione_ritiro_a_mano(
+    *, order_number: str, pesi_scatoloni_kg: list[float],
+    ordini_aggregati: list[str] | None = None,
+) -> dict:
+    """Ritiro a mano: la merce lascia la sede senza corriere (il cliente
+    passa a prenderla) — vedi sql/spedizioni_ritiro_a_mano.sql.
+
+    Nasce direttamente in stato 'ritirata': non esiste una bozza da
+    controllare né una conferma da dare, perché non c'è nessuna chiamata
+    con effetto reale da proteggere. `confermata_at` resta NULL — nessuna
+    spedizione è mai stata emessa presso un corriere — mentre
+    `ritirata_at` è il momento in cui registriamo l'uscita della merce.
+    Tracking, etichetta, prezzo e product_code restano vuoti: lo impone
+    anche un CHECK a DB, così nessuno li legge come se DHL avesse emesso
+    qualcosa."""
+    with get_connection() as conn:
+        row = conn.execute(
+            f"""
+            INSERT INTO viscotta.spedizioni
+                (order_number, corriere, stato, pesi_scatoloni_kg, ordini_aggregati, ritirata_at)
+            VALUES (%s, 'ritiro_a_mano', 'ritirata', %s, %s, now())
+            RETURNING {_COLONNE_SPEDIZIONE}
+            """,
+            (order_number, pesi_scatoloni_kg, ordini_aggregati or []),
+        ).fetchone()
+        conn.commit()
+    return _spedizione_da_riga(row)
