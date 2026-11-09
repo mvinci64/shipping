@@ -28,6 +28,12 @@ psql "$DATABASE_URL" -f ../sql/spedizioni_consolidate.sql
 # PRIMA di deployare questa versione.
 psql "$DATABASE_URL" -f ../sql/spedizioni_colli_dichiarati.sql
 
+# Ritiro a mano (il cliente passa a prendere la merce: nessun corriere,
+# nessuna etichetta, nessun costo) — allarga il CHECK su
+# spedizioni.corriere e impone che i campi DHL restino vuoti. Applicare
+# PRIMA di deployare la versione con POST /spedizioni/ritiro-a-mano.
+psql "$DATABASE_URL" -f ../sql/spedizioni_ritiro_a_mano.sql
+
 uvicorn app.main:app --reload
 ```
 
