@@ -40,6 +40,18 @@ def _payload_gs1_solo_gtin(gtin13: str) -> str:
     return f"\xf101{gtin13.rjust(14, '0')}"
 
 
+def _disegna_barcode_gtin(c, W, margine, gtin: str) -> None:
+    """Barcode GS1-128 col solo AI(01) in fondo all'etichetta, più il GTIN
+    in chiaro — usato dalle etichette senza lotto/scadenza."""
+    from reportlab.lib.units import mm
+    from reportlab.graphics.barcode import code128
+
+    bc = code128.Code128(_payload_gs1_solo_gtin(gtin), barHeight=10 * mm, barWidth=0.22 * mm)
+    bc.drawOn(c, W - margine - bc.width, 4 * mm)
+    c.setFont("Helvetica", 6)
+    c.drawRightString(W - margine, 14.5 * mm, f"GTIN {gtin}")
+
+
 def _tronca_a_larghezza(c, testo: str, font: str, size: float, larghezza_max: float) -> str:
     """Accorcia testo con '…' finché non entra in larghezza_max, al size dato."""
     if c.stringWidth(testo, font, size) <= larghezza_max:
@@ -158,6 +170,16 @@ def make_inner_labels_pdf(
             y -= 2 * mm
             c.setFont("Helvetica-Bold", 20)
             c.drawString(margine, y, f"{etichetta['pezzi']} pz")
+            # Il barcode torna solo se il collo ha UN SOLO componente ed è
+            # proprio lo SKU dell'override: lì il GTIN è davvero quello del
+            # prodotto nella scatola (caso reale UNIGROUP ORD-20261104-3532,
+            # 08/11/2026: 4 WP50 da 25 CANTS100 invece dei 24+4 automatici,
+            # che il barcode ce l'avevano). Con più componenti resta senza,
+            # per il motivo detto sopra: non c'è un solo GTIN da stampare.
+            componenti = item.get("componenti") or []
+            gtin_override = (gtins or {}).get(etichetta["sku"])
+            if gtin_override and len(componenti) == 1 and componenti[0]["sku"] == etichetta["sku"]:
+                _disegna_barcode_gtin(c, W, margine, gtin_override)
             c.showPage()
             continue
 
@@ -250,11 +272,7 @@ def make_inner_labels_pdf(
                 c.drawRightString(W - margine, 6 * mm, "GTIN non censito")
         elif gtin:
             # solo prodotto, senza lotto/scadenza — barcode GS1 col solo AI(01)
-            payload = _payload_gs1_solo_gtin(gtin)
-            bc = code128.Code128(payload, barHeight=10 * mm, barWidth=0.22 * mm)
-            bc.drawOn(c, W - margine - bc.width, 4 * mm)
-            c.setFont("Helvetica", 6)
-            c.drawRightString(W - margine, 14.5 * mm, f"GTIN {gtin}")
+            _disegna_barcode_gtin(c, W, margine, gtin)
         c.showPage()
 
     for nota in note_omaggio or []:

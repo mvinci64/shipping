@@ -81,3 +81,38 @@ def test_make_carton_summary_labels_pdf_con_non_censiti():
     assert result["non_censiti"]
     pdf = make_carton_summary_labels_pdf("TEST-001", "Cliente Prova", "2026-09-10", result)
     assert pdf.startswith(b"%PDF-")
+
+
+def test_etichetta_con_override_a_un_solo_componente_tiene_il_barcode():
+    """Un collo misto con UN solo SKU e l'override su quello stesso SKU è a
+    tutti gli effetti un collo a prodotto singolo: il GTIN è davvero quello
+    del contenuto, quindi il barcode resta (caso UNIGROUP, 4 WP50 da 25
+    CANTS100 al posto dei 24+4 automatici)."""
+    import pymupdf
+    result = cartonize_order([{"sku": "CANTS100", "qta": 25}], colli_misti=[{
+        "formato": "WP50",
+        "componenti": [{"sku": "CANTS100", "pezzi": 25}],
+        "etichetta_sku": "CANTS100", "etichetta_pezzi": 25,
+    }])
+    pdf = make_inner_labels_pdf(
+        "TEST-001", "Cliente Prova", result, {}, {"CANTS100": "8055829950212"},
+        {"CANTS100": "Cantuccini salati 100 g"},
+    )
+    testo = "".join(p.get_text() for p in pymupdf.open(stream=pdf, filetype="pdf"))
+    assert "25 pz" in testo
+    assert "GTIN 8055829950212" in testo
+
+
+def test_etichetta_con_override_su_piu_componenti_resta_senza_barcode():
+    import pymupdf
+    result = cartonize_order([{"sku": "VP01", "qta": 50}, {"sku": "VP06", "qta": 50}], colli_misti=[{
+        "formato": "WP40",
+        "componenti": [{"sku": "VP01", "pezzi": 50}, {"sku": "VP06", "pezzi": 50}],
+        "etichetta_sku": "CANTS100", "etichetta_pezzi": 9,
+    }])
+    pdf = make_inner_labels_pdf(
+        "TEST-001", "Cliente Prova", result, {}, {"CANTS100": "8055829950212"},
+        {"CANTS100": "Cantuccini salati 100 g"},
+    )
+    testo = "".join(p.get_text() for p in pymupdf.open(stream=pdf, filetype="pdf"))
+    assert "GTIN" not in testo

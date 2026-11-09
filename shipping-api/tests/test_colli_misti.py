@@ -4,9 +4,10 @@ from app.cartonize import cartonize_order, collo_misto_box
 
 
 def test_collo_misto_box_peso_somma_componenti_piu_tara():
-    formato, sku, pezzi, peso, componenti = collo_misto_box(
+    formato, sku, pezzi, peso, componenti, etichetta = collo_misto_box(
         "WP40", [{"sku": "VP01", "pezzi": 50}, {"sku": "VP06", "pezzi": 50}]
     )
+    assert etichetta is None
     assert formato == "WP40"
     assert sku is None
     assert pezzi == 100
